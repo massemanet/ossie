@@ -1,5 +1,5 @@
 [{<<"asn1_ws">>,
-  {git,"https://github.com/massemanet/asn1-ws",
+  {git,"https://github.com/massemanet/asn1_ws",
        {ref,"40a1c8aa370501887addc97232cc0cb5779c9c31"}},
   0},
  {<<"epcap">>,
