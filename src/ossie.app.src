@@ -1,17 +1,13 @@
 {application, ossie,
  [{description, "OSmo/SIgnErl telco stack"},
   {vsn, "1.01"},
-  {registered, [ossie_app]},
-  {mod, {ossie_app, []}},
+  {registered, []},
   {applications,
    [kernel,
     stdlib,
     pkt,
     epcap
    ]},
-  {env,[]},
-  {modules, []},
-
   {licenses, ["GNU AFFERO GENERAL PUBLIC LICENSE"]},
   {links, ["osmocom.org"]}
  ]}.
