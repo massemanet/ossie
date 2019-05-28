@@ -78,8 +78,6 @@ parse_m3ua_opt(Opt = m3ua_iei_protocol_data, MsgBin) when is_binary(MsgBin) ->
 parse_m3ua_opt(Opt, Msg) ->
     {Opt, Msg}.
 
-
-
 encode_m3ua_msg(#m3ua_msg{version = Version, msg_class = MsgClass,
                           msg_type = MsgType, payload = OptList}) ->
     OptBin = encode_m3ua_opts(OptList),
