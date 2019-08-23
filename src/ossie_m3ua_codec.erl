@@ -92,8 +92,7 @@ encode_m3ua_opts([], Bin) ->
 encode_m3ua_opts([{Iei, Attr}|Tail], Bin) ->
     OptBin = encode_m3ua_opt(Iei, Attr),
     encode_m3ua_opts(Tail, <<Bin/binary, OptBin/binary>>).
-
-encode_m3ua_opt(?M3UA_IEI_PROTOCOL_DATA, Mtp3) when is_record(Mtp3, mtp3_msg) ->
+encode_m3ua_opt(m3ua_iei_protocol_data, Mtp3) when is_record(Mtp3, mtp3_msg) ->
     #mtp3_msg{network_ind = Ni, service_ind = Si,
               routing_label = #mtp3_routing_label{sig_link_sel = Sls,
                                                   origin_pc = OpcIn,
