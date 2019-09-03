@@ -93,7 +93,7 @@ encode_m3ua_opts([{Iei, Attr}|Tail], Bin) ->
     OptBin = encode_m3ua_opt(Iei, Attr),
     encode_m3ua_opts(Tail, <<Bin/binary, OptBin/binary>>).
 
-encode_m3ua_opt(?M3UA_IEI_PROTOCOL_DATA, Mtp3) when is_record(Mtp3, mtp3_msg) ->
+encode_m3ua_opt(m3ua_iei_protocol_data, Mtp3) when is_record(Mtp3, mtp3_msg) ->
     #mtp3_msg{network_ind = Ni, service_ind = Si,
               routing_label = #mtp3_routing_label{sig_link_sel = Sls,
                                                   origin_pc = OpcIn,
@@ -106,33 +106,59 @@ encode_m3ua_opt(?M3UA_IEI_PROTOCOL_DATA, Mtp3) when is_record(Mtp3, mtp3_msg) ->
         _ -> MpD = Mp
     end,
     PayBin = <<Opc:32/big, Dpc:32/big, Si:8, Ni:8, MpD:8, Sls:8, Payload/binary>>,
-    encode_m3ua_opt(?M3UA_IEI_PROTOCOL_DATA, PayBin);
-encode_m3ua_opt(Iei, Data) when is_integer(Iei), is_binary(Data) ->
+    encode_m3ua_opt(m3ua_iei_protocol_data, PayBin);
+encode_m3ua_opt(Iei, Data) when is_binary(Data) ->
     Length = byte_size(Data) + 4,
     PadLen = get_num_pad_bytes(Length),
-    <<Iei:16/big, Length:16/big, Data/binary, 0:PadLen/integer-unit:8>>.
+    IEI = enc_iei(Iei),
+    <<IEI:16/big, Length:16/big, Data/binary, 0:PadLen/integer-unit:8>>.
 
-dec_iei(?M3UA_IEI_INFO_STRING) -> m3ua_iei_info_string;
-dec_iei(?M3UA_IEI_ROUTE_CTX) -> m3ua_iei_route_ctx;
-dec_iei(?M3UA_IEI_DIAG_INFO) -> m3ua_iei_diag_info;
-dec_iei(?M3UA_IEI_HEARTB_DATA) -> m3ua_iei_heartb_data;
+dec_iei(?M3UA_IEI_INFO_STRING)    -> m3ua_iei_info_string;
+dec_iei(?M3UA_IEI_ROUTE_CTX)      -> m3ua_iei_route_ctx;
+dec_iei(?M3UA_IEI_DIAG_INFO)      -> m3ua_iei_diag_info;
+dec_iei(?M3UA_IEI_HEARTB_DATA)    -> m3ua_iei_heartb_data;
 dec_iei(?M3UA_IEI_TRAF_MODE_TYPE) -> m3ua_iei_traf_mode_type;
-dec_iei(?M3UA_IEI_ERR_CODE) -> m3ua_iei_err_code;
-dec_iei(?M3UA_IEI_STATUS) -> m3ua_iei_status;
-dec_iei(?M3UA_IEI_ASP_ID) -> m3ua_iei_asp_id;
-dec_iei(?M3UA_IEI_AFFECTED_PC) -> m3ua_iei_affected_pc;
-dec_iei(?M3UA_IEI_CORR_ID) -> m3ua_iei_corr_id;
+dec_iei(?M3UA_IEI_ERR_CODE)       -> m3ua_iei_err_code;
+dec_iei(?M3UA_IEI_STATUS)         -> m3ua_iei_status;
+dec_iei(?M3UA_IEI_ASP_ID)         -> m3ua_iei_asp_id;
+dec_iei(?M3UA_IEI_AFFECTED_PC)    -> m3ua_iei_affected_pc;
+dec_iei(?M3UA_IEI_CORR_ID)        -> m3ua_iei_corr_id;
 dec_iei(?M3UA_IEI_NET_APPEARANCE) -> m3ua_iei_net_appearance;
-dec_iei(?M3UA_IEI_USER_CAUSE) -> m3ua_iei_user_cause;
+dec_iei(?M3UA_IEI_USER_CAUSE)     -> m3ua_iei_user_cause;
 dec_iei(?M3UA_IEI_CONGESTION_IND) -> m3ua_iei_congestion_ind;
-dec_iei(?M3UA_IEI_CONCERNED_IND) -> m3ua_iei_concerned_ind;
-dec_iei(?M3UA_IEI_ROUTING_KEY) -> m3ua_iei_routing_key;
-dec_iei(?M3UA_IEI_REG_RESULT) -> m3ua_iei_reg_result;
-dec_iei(?M3UA_IEI_DEREG_RESULT) -> m3ua_iei_dereg_result;
-dec_iei(?M3UA_IEI_LOCAL_RKEY_ID) -> m3ua_iei_local_rkey_id;
-dec_iei(?M3UA_IEI_DEST_PC) -> m3ua_iei_dest_pc;
-dec_iei(?M3UA_IEI_SERVICE_IND) -> m3ua_iei_service_ind;
-dec_iei(?M3UA_IEI_ORIG_PC_LIST) -> m3ua_iei_orig_pc_list;
-dec_iei(?M3UA_IEI_PROTOCOL_DATA) -> m3ua_iei_protocol_data;
-dec_iei(?M3UA_IEI_REG_STATUS) -> m3ua_iei_reg_status;
-dec_iei(?M3UA_IEI_DEREG_STATUS) -> m3ua_iei_dereg_status.
+dec_iei(?M3UA_IEI_CONCERNED_IND)  -> m3ua_iei_concerned_ind;
+dec_iei(?M3UA_IEI_ROUTING_KEY)    -> m3ua_iei_routing_key;
+dec_iei(?M3UA_IEI_REG_RESULT)     -> m3ua_iei_reg_result;
+dec_iei(?M3UA_IEI_DEREG_RESULT)   -> m3ua_iei_dereg_result;
+dec_iei(?M3UA_IEI_LOCAL_RKEY_ID)  -> m3ua_iei_local_rkey_id;
+dec_iei(?M3UA_IEI_DEST_PC)        -> m3ua_iei_dest_pc;
+dec_iei(?M3UA_IEI_SERVICE_IND)    -> m3ua_iei_service_ind;
+dec_iei(?M3UA_IEI_ORIG_PC_LIST)   -> m3ua_iei_orig_pc_list;
+dec_iei(?M3UA_IEI_PROTOCOL_DATA)  -> m3ua_iei_protocol_data;
+dec_iei(?M3UA_IEI_REG_STATUS)     -> m3ua_iei_reg_status;
+dec_iei(?M3UA_IEI_DEREG_STATUS)   -> m3ua_iei_dereg_status.
+
+enc_iei(m3ua_iei_info_string)    -> ?M3UA_IEI_INFO_STRING;
+enc_iei(m3ua_iei_route_ctx)      -> ?M3UA_IEI_ROUTE_CTX;
+enc_iei(m3ua_iei_diag_info)      -> ?M3UA_IEI_DIAG_INFO;
+enc_iei(m3ua_iei_heartb_data)    -> ?M3UA_IEI_HEARTB_DATA;
+enc_iei(m3ua_iei_traf_mode_type) -> ?M3UA_IEI_TRAF_MODE_TYPE;
+enc_iei(m3ua_iei_err_code)       -> ?M3UA_IEI_ERR_CODE;
+enc_iei(m3ua_iei_status)         -> ?M3UA_IEI_STATUS;
+enc_iei(m3ua_iei_asp_id)         -> ?M3UA_IEI_ASP_ID;
+enc_iei(m3ua_iei_affected_pc)    -> ?M3UA_IEI_AFFECTED_PC;
+enc_iei(m3ua_iei_corr_id)        -> ?M3UA_IEI_CORR_ID;
+enc_iei(m3ua_iei_net_appearance) -> ?M3UA_IEI_NET_APPEARANCE;
+enc_iei(m3ua_iei_user_cause)     -> ?M3UA_IEI_USER_CAUSE;
+enc_iei(m3ua_iei_congestion_ind) -> ?M3UA_IEI_CONGESTION_IND;
+enc_iei(m3ua_iei_concerned_ind)  -> ?M3UA_IEI_CONCERNED_IND;
+enc_iei(m3ua_iei_routing_key)    -> ?M3UA_IEI_ROUTING_KEY;
+enc_iei(m3ua_iei_reg_result)     -> ?M3UA_IEI_REG_RESULT;
+enc_iei(m3ua_iei_dereg_result)   -> ?M3UA_IEI_DEREG_RESULT;
+enc_iei(m3ua_iei_local_rkey_id)  -> ?M3UA_IEI_LOCAL_RKEY_ID;
+enc_iei(m3ua_iei_dest_pc)        -> ?M3UA_IEI_DEST_PC;
+enc_iei(m3ua_iei_service_ind)    -> ?M3UA_IEI_SERVICE_IND;
+enc_iei(m3ua_iei_orig_pc_list)   -> ?M3UA_IEI_ORIG_PC_LIST;
+enc_iei(m3ua_iei_protocol_data)  -> ?M3UA_IEI_PROTOCOL_DATA;
+enc_iei(m3ua_iei_reg_status)     -> ?M3UA_IEI_REG_STATUS;
+enc_iei(m3ua_iei_dereg_status)   -> ?M3UA_IEI_DEREG_STATUS.
