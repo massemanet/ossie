@@ -157,7 +157,28 @@
 -define(SCCP_SSN_MAP_SGSN,	149).
 -define(SCCP_SSN_MAP_GGSN,	150).
 
--type sccp_msg_type()		:: 0..255.
+-type sccp_msgt() :: sccp_msgt_cr    |	% Connection request
+                     sccp_msgt_cc    |	% Connection confirm
+                     sccp_msgt_cref  |	% Connection refused
+                     sccp_msgt_rlsd  |	% Released
+                     sccp_msgt_rlc   |	% Release complete
+                     sccp_msgt_dt1   |	% Data form 1
+                     sccp_msgt_dt2   |	% Data form 2
+                     sccp_msgt_ak    |	% Data acknowledgement
+                     sccp_msgt_udt   |	% Unitdata
+                     sccp_msgt_udts  |	% Unitdata service
+                     sccp_msgt_ed    |	% Expedited data
+                     sccp_msgt_ea    |	% Expedited data ack
+                     sccp_msgt_rsr   |	% Reset Request
+                     sccp_msgt_rsc   |	% Reset Confirmation
+                     sccp_msgt_err   |	% Protocol data unit error
+                     sccp_msgt_it    |	% Inactivity test
+                     sccp_msgt_xudt  |	% Extended unitdata
+                     sccp_msgt_xudts |	% Extended unitdata service
+                     sccp_msgt_ludt  |	% Long unitdata
+                     sccp_msgt_ludts.	% Long unitdata service
+
+-type sccp_msg_type()		:: 0..255 | sccp_msgt().
 -type sccp_proto_class()	:: 0..3.
 
 % a single parsed SCCP message

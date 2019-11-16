@@ -2,5 +2,5 @@
 .\#*
 *~
 
+/.rebar3/
 /_build/
-/asngen/
