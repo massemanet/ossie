@@ -50,24 +50,27 @@
 -define(SCCP_GTI_TT_NP_ENC,	2#0011).
 -define(SCCP_GTI_TT_NP_ENC_NAT,	2#0100).
 
-% According to Q.731 Section 3.4.2.2
--define(SCCP_SSN_UNKNOWN,	2#000000000).
--define(SCCP_SSN_SCCP_MGMT,	2#000000001).
--define(SCCP_SSN_ITU_T,		2#000000010).
--define(SCCP_SSN_ISUP,		2#000000011).
--define(SCCP_SSN_OAM,		2#000000100).
--define(SCCP_SSN_MAP,		2#000000101).
--define(SCCP_SSN_HLR,		2#000000110).
--define(SCCP_SSN_VLR,		2#000000111).
--define(SCCP_SSN_MSC,		2#000001000).
--define(SCCP_SSN_EIR,		2#000001001).
--define(SCCP_SSN_AUC,		2#000001010).
--define(SCCP_SSN_ISDN_SS,	2#000001011).
--define(SCCP_SSN_RES_NAT,	2#000001100).
--define(SCCP_SSN_BISDN,		2#000001101).
--define(SCCP_SSN_TC_TEST,	2#000001110).
+% According to Q.713 Section 3.4.2.2
+-define(SCCP_SSN_UNKNOWN,	2#00000000).
+-define(SCCP_SSN_SCCP_MGMT,	2#00000001).
+-define(SCCP_SSN_ITU_T,		2#00000010).
+-define(SCCP_SSN_ISUP,		2#00000011).
+-define(SCCP_SSN_OAM,		2#00000100).
+-define(SCCP_SSN_MAP,		2#00000101).
+-define(SCCP_SSN_HLR,		2#00000110).
+-define(SCCP_SSN_VLR,		2#00000111).
+-define(SCCP_SSN_MSC,		2#00001000).
+-define(SCCP_SSN_EIR,		2#00001001).
+-define(SCCP_SSN_AUC,		2#00001010).
+-define(SCCP_SSN_ISDN_SS,	2#00001011).
+-define(SCCP_SSN_RES_NAT,	2#00001100).
+-define(SCCP_SSN_BISDN,		2#00001101).
+-define(SCCP_SSN_TC_TEST,	2#00001110).
 
-% According to Q.731 Section 3.4.2.3.1
+% According to Q.713 Section 3.4.2.3.1
+% Bit 8 of octet 1 contains the odd/even indicator and is coded as follows:
+% 0 - even number of address signals
+% 1 - odd number of address signals
 -define(SCCP_NAI_SUBSCRIBER,	2#00000001).
 -define(SCCP_NAI_NATIONA_SIGN,	2#00000011).
 -define(SCCP_NAI_INTERNATIONAL,	2#00000100).
@@ -148,14 +151,15 @@
 -define(SCCP_CAUSE_REF_UNEQUIPPED_USER,		2#00010011).
 
 % SCCP sub-system numbers
--define(SCCP_SSN_MAP_HLR,	6).
--define(SCCP_SSN_MAP_VLR,	7).
--define(SCCP_SSN_MAP_MSC,	8).
--define(SCCP_SSN_MAP_EIR,	9).
--define(SCCP_SSN_MAP_GMLC,	145).
--define(SCCP_SSN_MAP_gsmSCF,	147).
--define(SCCP_SSN_MAP_SGSN,	149).
--define(SCCP_SSN_MAP_GGSN,	150).
+-define(SCCP_SSN_MAP_HLR,	2#00000110).
+-define(SCCP_SSN_MAP_VLR,	2#00000111).
+-define(SCCP_SSN_MAP_MSC,	2#00001000).
+-define(SCCP_SSN_MAP_EIR,	2#00001001).
+-define(SCCP_SSN_MAP_GMLC,	2#10010001).
+-define(SCCP_SSN_MAP_gsmSCF,	2#10010011).
+-define(SCCP_SSN_MAP_SIWF,	2#10010100).
+-define(SCCP_SSN_MAP_SGSN,	2#10010101).
+-define(SCCP_SSN_MAP_GGSN,	2#10010110).
 
 -type sccp_msgt() :: sccp_msgt_cr    |	% Connection request
                      sccp_msgt_cc    |	% Connection confirm
