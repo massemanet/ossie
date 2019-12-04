@@ -150,12 +150,17 @@
 -define(SCCP_CAUSE_REF_NO_GTT_FOR_NATURE,	2#00010010).
 -define(SCCP_CAUSE_REF_UNEQUIPPED_USER,		2#00010011).
 
-% SCCP sub-system numbers
+% 3GPP TS 23.003, Chapter 8.1 - Global subsystem numbers
 -define(SCCP_SSN_MAP_HLR,	2#00000110).
 -define(SCCP_SSN_MAP_VLR,	2#00000111).
 -define(SCCP_SSN_MAP_MSC,	2#00001000).
 -define(SCCP_SSN_MAP_EIR,	2#00001001).
+
+% 3GPP TS 23.003, Chapter 8.2 - National subsystem numbers
+-define(SCCP_SSN_RANAP,		2#10001110).
+-define(SCCP_SSN_RNSAP,		2#10001111).
 -define(SCCP_SSN_MAP_GMLC,	2#10010001).
+-define(SCCP_SSN_CAP,		2#10010010).
 -define(SCCP_SSN_MAP_gsmSCF,	2#10010011).
 -define(SCCP_SSN_MAP_SIWF,	2#10010100).
 -define(SCCP_SSN_MAP_SGSN,	2#10010101).
