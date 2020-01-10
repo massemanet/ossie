@@ -65,11 +65,41 @@
 -define(M3UA_IEI_REG_STATUS,		16#0212).
 -define(M3UA_IEI_DEREG_STATUS,		16#0213).
 
+-type m3ua_msgc() :: m3ua_msgc_mgmt            |
+                     m3ua_msgc_transfer        |
+                     m3ua_msgc_ssnm            |
+                     m3ua_msgc_aspsm           |
+                     m3ua_msgc_asptm           |
+                     m3ua_msgc_rkm.
+
+-type m3ua_msgt() :: m3ua_msgt_mgmt_err        |
+                     m3ua_msgt_mgmt_ntfy       |
+                     m3ua_msgt_xfr_data        |
+                     m3ua_msgt_ssnm_duna       |
+                     m3ua_msgt_ssnm_dava       |
+                     m3ua_msgt_ssnm_daud       |
+                     m3ua_msgt_ssnm_scon       |
+                     m3ua_msgt_ssnm_dupu       |
+                     m3ua_msgt_ssnm_drst       |
+                     m3ua_msgt_aspsm_aspup     |
+                     m3ua_msgt_aspsm_aspdn     |
+                     m3ua_msgt_aspsm_beat      |
+                     m3ua_msgt_aspsm_aspup_ack |
+                     m3ua_msgt_aspsm_aspdn_ack |
+                     m3ua_msgt_aspsm_beat_ack  |
+                     m3ua_msgt_asptm_aspac     |
+                     m3ua_msgt_asptm_aspia     |
+                     m3ua_msgt_asptm_aspac_ack |
+                     m3ua_msgt_asptm_aspia_ack |
+                     m3ua_msgt_rkm_reg_req     |
+                     m3ua_msgt_rkm_reg_rsp     |
+                     m3ua_msgt_rkm_dereg_req   |
+                     m3ua_msgt_rkm_dereg_rsp.
+
 -record(m3ua_msg, {
 	 version	:: 0..255,
-	 msg_class	:: 0..255,
-	 msg_type	:: 0..255,
+	 msg_class	:: 0..255 | m3ua_msgc(),
+	 msg_type	:: 0..255 | m3ua_msgt(),
 	 msg_length	:: 0..4294967295,
 	 payload
 	}).
-
