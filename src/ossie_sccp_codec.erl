@@ -191,13 +191,13 @@ parse_sccp_msgt(?SCCP_MSGT_DT1, DataBin) ->
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
     %% build parsed list of message
-    [{dst_local_ref, DstLocalRef},{segm_reass, SegmReass},{user_data, UserData}];
+    [{dst_local_ref, DstLocalRef},{segm_reass, SegmReass},{data, UserData}];
 parse_sccp_msgt(?SCCP_MSGT_DT2, DataBin) ->
     <<_:8, DstLocalRef:24/big, SeqSegm:16, DataPtr:8, Remain/binary >> = DataBin,
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
     %% build parsed list of message
-    [{dst_local_ref, DstLocalRef},{seq_segm, SeqSegm},{user_data, UserData}];
+    [{dst_local_ref, DstLocalRef},{seq_segm, SeqSegm},{data, UserData}];
 parse_sccp_msgt(?SCCP_MSGT_AK, DataBin) ->
     <<_:8, DstLocalRef:24/big, RxSeqnr:8, Credit:8>> = DataBin,
     [{dst_local_ref, DstLocalRef},{rx_seq_nr, RxSeqnr},{credit, Credit}];
@@ -213,7 +213,7 @@ parse_sccp_msgt(?SCCP_MSGT_UDT, DataBin) ->
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
     [{protocol_class, {ProtoClass, PCOpt}},{called_party_addr, CalledPartyDec},
-     {calling_party_addr, CallingPartyDec},{user_data, UserData}];
+     {calling_party_addr, CallingPartyDec},{data, UserData}];
 parse_sccp_msgt(?SCCP_MSGT_UDTS, DataBin) ->
     <<_:8, ReturnCause:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, Remain/binary >> = DataBin,
     %% variable part
@@ -226,12 +226,12 @@ parse_sccp_msgt(?SCCP_MSGT_UDTS, DataBin) ->
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
     [{return_cause, ReturnCause},{called_party_addr, CalledPartyDec},
-     {calling_party_addr, CallingPartyDec},{user_data, UserData}];
+     {calling_party_addr, CallingPartyDec},{data, UserData}];
 parse_sccp_msgt(?SCCP_MSGT_ED, DataBin) ->
     <<_:8, DstLocalRef:24/big, DataPtr:8, Remain/binary>> = DataBin,
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
-    [{dst_local_ref, DstLocalRef}, {user_data, UserData}];
+    [{dst_local_ref, DstLocalRef}, {data, UserData}];
 parse_sccp_msgt(?SCCP_MSGT_EA, DataBin) ->
     <<_:8, DstLocalRef:24/big>> = DataBin,
     [{dst_local_ref, DstLocalRef}];
@@ -389,24 +389,24 @@ encode_sccp_msgt(?SCCP_MSGT_CR, Params) ->
     CalledPartyEnc = encode_sccp_addr(CalledParty),
     CalledPartyLen = byte_size(CalledPartyEnc),
     PtrOpt = CalledPartyLen+1+1,
-    OptBin = encode_sccp_opts(Params, [credit, calling_party_addr, user_data, hop_counter, importance]),
+    OptBin = encode_sccp_opts(Params, [credit, calling_party_addr, data, hop_counter, importance]),
     <<?SCCP_MSGT_CR:8, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, 2:8, PtrOpt:8, CalledPartyLen:8, CalledPartyEnc/binary, OptBin/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_CC, Params) ->
     SrcLocalRef = proplists:get_value(src_local_ref, Params),
     DstLocalRef = proplists:get_value(dst_local_ref, Params),
     {ProtoClass, PCOpt} = proplists:get_value(protocol_class, Params),
-    OptBin = encode_sccp_opts(Params, [credit, called_party_addr, user_data, importance]),
+    OptBin = encode_sccp_opts(Params, [credit, called_party_addr, data, importance]),
     <<?SCCP_MSGT_CC:8, DstLocalRef:24/big, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, OptBin/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_CREF, Params) ->
     DstLocalRef = proplists:get_value(dst_local_ref, Params),
     RefusalCause = proplists:get_value(refusal_cause, Params),
-    OptBin = encode_sccp_opts(Params, [called_party_addr, user_data, importance]),
+    OptBin = encode_sccp_opts(Params, [called_party_addr, data, importance]),
     <<?SCCP_MSGT_CREF:8, DstLocalRef:24/big, RefusalCause:8, OptBin/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_RLSD, Params) ->
     SrcLocalRef = proplists:get_value(src_local_ref, Params),
     DstLocalRef = proplists:get_value(dst_local_ref, Params),
     ReleaseCause = proplists:get_value(release_cause, Params),
-    OptBin = encode_sccp_opts(Params, [user_data, importance]),
+    OptBin = encode_sccp_opts(Params, [data, importance]),
     <<?SCCP_MSGT_RLSD:8, DstLocalRef:24/big, SrcLocalRef:24/big, ReleaseCause:8, OptBin/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_RLC, Params) ->
     SrcLocalRef = proplists:get_value(src_local_ref, Params),
@@ -415,13 +415,13 @@ encode_sccp_msgt(?SCCP_MSGT_RLC, Params) ->
 encode_sccp_msgt(?SCCP_MSGT_DT1, Params) ->
     DstLocalRef = proplists:get_value(dst_local_ref, Params),
     SegmReass = proplists:get_value(segm_reass, Params),
-    UserData = binarify(proplists:get_value(user_data, Params)),
+    UserData = binarify(proplists:get_value(data, Params)),
     UserDataLen = byte_size(UserData),
     <<?SCCP_MSGT_DT1:8, DstLocalRef:24/big, SegmReass:8, 1:8, UserDataLen:8, UserData/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_DT2, Params) ->
     DstLocalRef = proplists:get_value(dst_local_ref, Params),
     SeqSegm = proplists:get_value(seq_segm, Params),
-    UserData = binarify(proplists:get_value(user_data, Params)),
+    UserData = binarify(proplists:get_value(data, Params)),
     UserDataLen = byte_size(UserData),
     <<?SCCP_MSGT_DT2:8, DstLocalRef:24/big, SeqSegm:16, 1:8, UserDataLen:8, UserData/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_AK, Params) ->
@@ -437,7 +437,7 @@ encode_sccp_msgt(?SCCP_MSGT_UDT, Params) ->
     CallingParty = proplists:get_value(calling_party_addr, Params),
     CallingPartyEnc = encode_sccp_addr(CallingParty),
     CallingPartyLen = byte_size(CallingPartyEnc),
-    UserData = binarify(proplists:get_value(user_data, Params)),
+    UserData = binarify(proplists:get_value(data, Params)),
     UserDataLen = byte_size(UserData),
     %% variable part
     CalledPartyPtr = 3,
@@ -455,7 +455,7 @@ encode_sccp_msgt(?SCCP_MSGT_UDTS, Params) ->
     CallingParty = proplists:get_value(calling_party_addr, Params),
     CallingPartyEnc = encode_sccp_addr(CallingParty),
     CallingPartyLen = byte_size(CallingPartyEnc),
-    UserData = binarify(proplists:get_value(user_data, Params)),
+    UserData = binarify(proplists:get_value(data, Params)),
     UserDataLen = byte_size(UserData),
     %% variable part
     CalledPartyPtr = 3,
@@ -467,7 +467,7 @@ encode_sccp_msgt(?SCCP_MSGT_UDTS, Params) ->
     <<?SCCP_MSGT_UDTS:8, ReturnCause:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, Remain/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_ED, Params) ->
     DstLocalRef = proplists:get_value(dst_local_ref, Params),
-    UserData = binarify(proplists:get_value(user_data, Params)),
+    UserData = binarify(proplists:get_value(data, Params)),
     UserDataLen = byte_size(UserData),
     DataPtr = 1,
     <<?SCCP_MSGT_ED:8, DstLocalRef:24/big, DataPtr:8, UserDataLen:8, UserData/binary>>;
@@ -578,7 +578,7 @@ opt_to_atom(Num) ->
         ?SCCP_PNC_RESET_CAUSE ->                reset_cause;
         ?SCCP_PNC_ERROR_CAUSE ->                error_cause;
         ?SCCP_PNC_REFUSAL_CAUSE ->              refusal_cause;
-        ?SCCP_PNC_DATA ->                       user_data;
+        ?SCCP_PNC_DATA ->                       data;
         ?SCCP_PNC_SEGMENTATION ->               segmentation;
         ?SCCP_PNC_HOP_COUNTER ->                hop_counter;
         ?SCCP_PNC_IMPORTANCE ->                 importance;
@@ -602,7 +602,7 @@ atom_to_opt(Atom) ->
         reset_cause     -> ?SCCP_PNC_RESET_CAUSE;
         error_cause     -> ?SCCP_PNC_ERROR_CAUSE;
         refusal_cause   -> ?SCCP_PNC_REFUSAL_CAUSE;
-        user_data       -> ?SCCP_PNC_DATA;
+        data            -> ?SCCP_PNC_DATA;
         segmentation    -> ?SCCP_PNC_SEGMENTATION;
         hop_counter     -> ?SCCP_PNC_HOP_COUNTER;
         importance      -> ?SCCP_PNC_IMPORTANCE;
