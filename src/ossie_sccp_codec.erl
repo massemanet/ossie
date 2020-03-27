@@ -506,18 +506,18 @@ encode_sccp_msgt(?SCCP_MSGT_XUDT, Params) ->
     Data = proplists:get_value(data, Params),
     DataLen = byte_size(Data),
     OptBin = encode_sccp_opts(Params, [segmentation, importance]),
-    PtrCallingParty = 2+0+1,
-    PtrData = 1+CallingPartyLen+1+1,
-    PtrCalledParty = 3+CallingPartyLen+1+DataLen+1+1,
+    PtrCalledParty = 2+0+1,
+    PtrCallingParty = 1+CalledPartyLen+1+1,
+    PtrData = 3+CalledPartyLen+1+CallingPartyLen+1+1,
     PtrOpt = case OptBin of
                  <<>> -> 0;
-                 _ -> 0+CallingPartyLen+1+DataLen+1+CalledPartyLen+1+1
+                 _ -> 0+CalledPartyLen+1+CallingPartyLen+1+DataLen+1+1
              end,
     <<?SCCP_MSGT_XUDT:8, PCOpt:4, ProtoClass:4, HopCounter:8,
       PtrCalledParty:8, PtrCallingParty:8, PtrData:8, PtrOpt:8,
+      CalledPartyLen:8, CalledPartyEnc/binary,
       CallingPartyLen:8, CallingPartyEnc/binary,
       DataLen:8, Data/binary,
-      CalledPartyLen:8, CalledPartyEnc/binary,
       OptBin/binary>>.
 
 %% FIXME: XUDT/XUDTS, LUDT/LUDTS
