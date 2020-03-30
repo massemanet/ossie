@@ -506,12 +506,16 @@ encode_sccp_msgt(?SCCP_MSGT_XUDT, Params) ->
     Data = proplists:get_value(data, Params),
     DataLen = byte_size(Data),
     OptBin = encode_sccp_opts(Params, [segmentation, importance]),
-    PtrCalledParty = 2+0+1,
-    PtrCallingParty = 1+CalledPartyLen+1+1,
-    PtrData = 3+CalledPartyLen+1+CallingPartyLen+1+1,
+    %% (after four pointers)
+    PtrCalledParty = 4,
+    %% (after three pointers plus called party with length)
+    PtrCallingParty = 3 + (1 + CalledPartyLen),
+    %% (after two pointers plus called and calling parties with lengths)
+    PtrData = 2 + (1 + CalledPartyLen) + (1 + CallingPartyLen),
     PtrOpt = case OptBin of
                  <<>> -> 0;
-                 _ -> 0+CalledPartyLen+1+CallingPartyLen+1+DataLen+1+1
+                 %% after one pointer and called/calling parties and data, all with lengths
+                 _ -> 1 + (1 + CalledPartyLen) + (1 + CallingPartyLen) + (1 + DataLen)
              end,
     <<?SCCP_MSGT_XUDT:8, PCOpt:4, ProtoClass:4, HopCounter:8,
       PtrCalledParty:8, PtrCallingParty:8, PtrData:8, PtrOpt:8,
