@@ -266,9 +266,28 @@ parse_sccp_msgt(?SCCP_MSGT_XUDT, DataBin) ->
     OptList = parse_sccp_opts(OptBin, []),
     [{protocol_class, {ProtoClass, PCOpt}}, {hop_counter, HopCounter},
      {called_party_addr, CalledPartyDec}, {calling_party_addr, CallingPartyDec},
+     {data, Data} | OptList];
+parse_sccp_msgt(?SCCP_MSGT_XUDTS, DataBin) ->
+    <<_:8, ReturnCause:8, HopCounter:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, OptPtr:8, Remain/binary>> = DataBin,
+    CalledPartyLen = binary:at(Remain, CalledPartyPtr-4),
+    CalledParty = binary:part(Remain, CalledPartyPtr-4+1, CalledPartyLen),
+    CalledPartyDec = parse_sccp_addr(CalledParty),
+    CallingPartyLen = binary:at(Remain, CallingPartyPtr-3),
+    CallingParty = binary:part(Remain, CallingPartyPtr-3+1, CallingPartyLen),
+    CallingPartyDec = parse_sccp_addr(CallingParty),
+    DataLen = binary:at(Remain, DataPtr-2),
+    Data = binary:part(Remain, DataPtr-2+1, DataLen),
+
+    OptBin = case OptPtr of
+                 0 -> <<>>;
+                 _ -> binary:part(Remain, OptPtr-1, byte_size(Remain)-(OptPtr-1))
+             end,
+    OptList = parse_sccp_opts(OptBin, []),
+    [{return_cause, ReturnCause}, {hop_counter, HopCounter},
+     {called_party_addr, CalledPartyDec}, {calling_party_addr, CallingPartyDec},
      {data, Data} | OptList].
 
-%% FIXME: XUDTS, LUDT/LUDTS
+%% FIXME: LUDT/LUDTS
 
 %% process one incoming SCCP message
 parse_sccp_msg(DataBin) ->
@@ -522,10 +541,38 @@ encode_sccp_msgt(?SCCP_MSGT_XUDT, Params) ->
       CalledPartyLen:8, CalledPartyEnc/binary,
       CallingPartyLen:8, CallingPartyEnc/binary,
       DataLen:8, Data/binary,
+      OptBin/binary>>;
+encode_sccp_msgt(?SCCP_MSGT_XUDTS, Params) ->
+    ReturnCause = proplists:get_value(return_cause, Params),
+    HopCounter = proplists:get_value(hop_counter, Params),
+    CalledParty = proplists:get_value(called_party_addr, Params),
+    CalledPartyEnc = encode_sccp_addr(CalledParty),
+    CalledPartyLen = byte_size(CalledPartyEnc),
+    CallingParty = proplists:get_value(calling_party_addr, Params),
+    CallingPartyEnc = encode_sccp_addr(CallingParty),
+    CallingPartyLen = byte_size(CallingPartyEnc),
+    Data = proplists:get_value(data, Params),
+    DataLen = byte_size(Data),
+    OptBin = encode_sccp_opts(Params, [segmentation, importance]),
+    %% (after four pointers)
+    PtrCalledParty = 4,
+    %% (after three pointers plus called party with length)
+    PtrCallingParty = 3 + (1 + CalledPartyLen),
+    %% (after two pointers plus called and calling parties with lengths)
+    PtrData = 2 + (1 + CalledPartyLen) + (1 + CallingPartyLen),
+    PtrOpt = case OptBin of
+                 <<>> -> 0;
+                 %% after one pointer and called/calling parties and data, all with lengths
+                 _ -> 1 + (1 + CalledPartyLen) + (1 + CallingPartyLen) + (1 + DataLen)
+             end,
+    <<?SCCP_MSGT_XUDTS:8, ReturnCause:8, HopCounter:8,
+      PtrCalledParty:8, PtrCallingParty:8, PtrData:8, PtrOpt:8,
+      CalledPartyLen:8, CalledPartyEnc/binary,
+      CallingPartyLen:8, CallingPartyEnc/binary,
+      DataLen:8, Data/binary,
       OptBin/binary>>.
 
-%% FIXME: XUDT/XUDTS, LUDT/LUDTS
-
+%% FIXME: LUDT/LUDTS
 
 %% encode one sccp message data structure into the on-wire format
 encode_sccp_msg(#sccp_msg{msg_type = MsgType, parameters = Params}) ->
