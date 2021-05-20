@@ -75,6 +75,115 @@ parse_m3ua_opt(Opt = m3ua_iei_protocol_data, MsgBin) when is_binary(MsgBin) ->
                                                         origin_pc = Opc,
                                                         dest_pc = Dpc},
                     payload = Payload, m3ua_mp = Mp}};
+parse_m3ua_opt(m3ua_iei_orig_pc_list = Opt, MsgBin) when is_binary(MsgBin) ->
+    %% RFC4666 - Section 3.6.1
+    %% OPC List
+    %%    The Originating Point Code List parameter contains one or more SS7
+    %%    OPC entries, and its format is the same as for the Destination
+    %%    Point Code parameter.  The absence of the OPC List parameter in
+    %%    the Routing Key indicates the use of any OPC value.
+    %%
+    %%     0                   1                   2                   3
+    %%     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    %%    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    %%    |         Tag = 0x020e          |             Length            |
+    %%    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    %%    |      Mask     |          Origination Point Code #1            |
+    %%    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    %%    |      Mask     |          Origination Point Code #2            |
+    %%    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    %%    /                              ...                              /
+    %%    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    %%    |      Mask     |          Origination Point Code #n            |
+    %%    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    {_, Val} = parse_m3ua_opt(m3ua_iei_affected_pc, MsgBin),
+    {Opt, Val};
+parse_m3ua_opt(m3ua_iei_dest_pc = Opt, MsgBin) when is_binary(MsgBin) ->
+    %% RFC4666 - Section 3.6.1
+    %% Destination Point Code
+    %%       The Destination Point Code parameter is mandatory, and it
+    %%       identifies the Destination Point Code of incoming SS7 traffic
+    %%       for which the ASP is registering.  For an alias point code
+    %%       configuration, the DPC parameter would be repeated for each
+    %%       point code.  The format is the same as described for the
+    %%       Affected Destination parameter in the DUNA message (see Section
+    %%       3.4.1).  Its format is:
+    %%
+    %%     0                   1                   2                   3
+    %%     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    %%    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    %%    |         Tag = 0x020b          |         Length = 8            |
+    %%    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    %%    |    Mask = 0   |            Destination Point Code             |
+    %%    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    {_, Val} = parse_m3ua_opt(m3ua_iei_affected_pc, MsgBin),
+    {Opt, Val};
+parse_m3ua_opt(m3ua_iei_affected_pc = Opt, MsgBin) when is_binary(MsgBin) ->
+    %% RFC4666 - Section 3.4.1
+    %% Affected Point Code: n x 32 bits
+    %%    The Affected Point Code parameter contains a list of Affected
+    %%    Destination Point Code fields, each a three-octet parameter to
+    %%    allow for 14-, 16-, and 24-bit binary formatted SS7 Point Codes.
+    %%    Affected Point Codes that are less than 24 bits are padded on the
+    %%    left to the 24-bit boundary.  The encoding is shown below for ANSI
+    %%    and ITU Point Code examples.
+    %%
+    %%    ANSI 24-bit Point Code
+    %%      0                   1                   2                   3
+    %%      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    %%     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    %%     |     Mask      |    Network    |    Cluster    |     Member    |
+    %%     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    %%                     |MSB-----------------------------------------LSB|
+    %%
+    %%    ITU 14-bit Point Code
+    %%      0                   1                   2                   3
+    %%      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    %%     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    %%     |     Mask      |0 0 0 0 0 0 0 0 0 0|Zone |     Region    | SP  |
+    %%     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    %%                                          |MSB--------------------LSB|
+    %%
+    %%    It is optional to send an Affected Point Code parameter with more
+    %%    than one Affected PC, but it is mandatory to receive it.
+    %%    Including multiple Affected PCs may be useful when receipt of an
+    %%    MTP3 management message or a linkset event simultaneously affects
+    %%    the availability status of a list of destinations at an SG.
+    %%
+    %% Mask: 8 bits (unsigned integer)
+    %%    The Mask field can be used to identify a contiguous range of
+    %%    Affected Destination Point Codes.  Identifying a contiguous range
+    %%    of Affected DPCs may be useful when receipt of an MTP3 management
+    %%    message or a linkset event simultaneously affects the availability
+    %%    status of a series of destinations at an SG.
+    %%
+    %%    The Mask parameter is an integer representing a bit mask that can
+    %%    be applied to the related Affected PC field.  The bit mask
+    %%    identifies how many bits of the Affected PC field are significant
+    %%    and which are effectively "wildcarded".  For example, a mask of
+    %%    "8" indicates that the last eight bits of the PC are "wildcarded".
+    %%    For an ANSI 24-bit Affected PC, this is equivalent to signalling
+    %%    that all PCs in an ANSI Cluster are unavailable.  A mask of "3"
+    %%    indicates that the last three bits of the PC are "wildcarded".
+    %%    For a 14-bit ITU Affected PC, this is equivalent to signaling that
+    %%    an ITU Region is unavailable.  A mask value equal (or greater
+    %%    than) the number of bits in the PC indicates that the entire
+    %%    network appearance is affected; this is used to indicate network
+    %%    isolation to the ASP.
+    PCs = [{Mask, PCbin} || <<Mask:8, PCbin:24>> <= MsgBin],
+    %% MaskBits = math:pow(2, Mask) - 1,
+    %% LowPC = PCbin band (math:pow(2, 24)-1 xor MaskBits),
+    %% HighPC = PCbin bor MaskBits,
+    %% DivPCFun = fun(PC) ->
+    %%                    case PC of
+    %%                        <<0:10, Zone:3, Region:8, SP:3>> ->     % ITU 14-bits
+    %%                            {itu, Zone, Region, SP};
+    %%                        <<Network:8, Cluster:8, Member:8>> ->   % ANSI 24-bits
+    %%                            {ansi, Network, Cluster, Member}
+    %%                    end
+    %%            end,
+    %% PCs = [DivPCFun(PC) || PC <- lists:seq(LowPC, HighPC)],
+    {Opt, PCs};
 parse_m3ua_opt(Opt, Msg) ->
     {Opt, Msg}.
 
@@ -107,6 +216,15 @@ encode_m3ua_opt(m3ua_iei_protocol_data, Mtp3) when is_record(Mtp3, mtp3_msg) ->
     end,
     PayBin = <<Opc:32/big, Dpc:32/big, Si:8, Ni:8, MpD:8, Sls:8, Payload/binary>>,
     encode_m3ua_opt(m3ua_iei_protocol_data, PayBin);
+encode_m3ua_opt(m3ua_iei_orig_pc_list = Opt, PCs) when is_list(PCs) ->
+    DataBin = << <<Mask:8/binary, PCBin:24/binary>> || {Mask, PCBin} <- PCs >>,
+    encode_m3ua_opt(Opt, DataBin);
+encode_m3ua_opt(m3ua_iei_dest_pc = Opt, PCs) when is_list(PCs) ->
+    DataBin = << <<Mask:8/binary, PCBin:24/binary>> || {Mask, PCBin} <- PCs >>,
+    encode_m3ua_opt(Opt, DataBin);
+encode_m3ua_opt(m3ua_iei_affected_pc = Opt, PCs) when is_list(PCs) ->
+    DataBin = list_to_binary([ <<Mask:8, PC:24>> || {Mask, PC} <- PCs]),
+    encode_m3ua_opt(Opt, DataBin);
 encode_m3ua_opt(Iei, Data) when is_binary(Data) ->
     Length = byte_size(Data) + 4,
     PadLen = get_num_pad_bytes(Length),
