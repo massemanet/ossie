@@ -217,10 +217,10 @@ encode_m3ua_opt(m3ua_iei_protocol_data, Mtp3) when is_record(Mtp3, mtp3_msg) ->
     PayBin = <<Opc:32/big, Dpc:32/big, Si:8, Ni:8, MpD:8, Sls:8, Payload/binary>>,
     encode_m3ua_opt(m3ua_iei_protocol_data, PayBin);
 encode_m3ua_opt(m3ua_iei_orig_pc_list = Opt, PCs) when is_list(PCs) ->
-    DataBin = << <<Mask:8/binary, PCBin:24/binary>> || {Mask, PCBin} <- PCs >>,
+    DataBin = list_to_binary([ <<Mask:8, PC:24>> || {Mask, PC} <- PCs]),
     encode_m3ua_opt(Opt, DataBin);
 encode_m3ua_opt(m3ua_iei_dest_pc = Opt, PCs) when is_list(PCs) ->
-    DataBin = << <<Mask:8/binary, PCBin:24/binary>> || {Mask, PCBin} <- PCs >>,
+    DataBin = list_to_binary([ <<Mask:8, PC:24>> || {Mask, PC} <- PCs]),
     encode_m3ua_opt(Opt, DataBin);
 encode_m3ua_opt(m3ua_iei_affected_pc = Opt, PCs) when is_list(PCs) ->
     DataBin = list_to_binary([ <<Mask:8, PC:24>> || {Mask, PC} <- PCs]),
