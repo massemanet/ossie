@@ -187,7 +187,7 @@ parse_sccp_msgt(sccp_msgt_cref, DataBin) ->
     OptList = parse_sccp_opts(Remain, []),
     %% build parsed list of message
     #sccp_msg_params_cref{dst_local_ref = DstLocalRef,
-                          refusal_cause = RefusalCause,
+                          refusal_cause = dec_refusal_cause(RefusalCause),
                           called_party_addr = proplists:get_value(called_party_addr, OptList),
                           data = proplists:get_value(data, OptList),
                           importance = proplists:get_value(importance, OptList)
@@ -280,7 +280,7 @@ parse_sccp_msgt(sccp_msgt_rsr, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big, ResetCause:8>> = DataBin,
     #sccp_msg_params_rsr{dst_local_ref = DstLocalRef,
                          src_local_ref = SrcLocalRef,
-                         reset_cause = ResetCause
+                         reset_cause = dec_reset_cause(ResetCause)
                         };
 parse_sccp_msgt(sccp_msgt_rsc, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big>> = DataBin,
@@ -290,7 +290,7 @@ parse_sccp_msgt(sccp_msgt_rsc, DataBin) ->
 parse_sccp_msgt(sccp_msgt_err, DataBin) ->
     <<_:8, DstLocalRef:24/big, ErrCause:8>> = DataBin,
     #sccp_msg_params_err{dst_local_ref = DstLocalRef,
-                         error_cause = ErrCause
+                         error_cause = dec_error_cause(ErrCause)
                         };
 parse_sccp_msgt(sccp_msgt_it, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big, PCOpt: 4, ProtoClass:4, SegmSeq:16, Credit:8>> = DataBin,
@@ -548,7 +548,7 @@ encode_sccp_msgt(?SCCP_MSGT_CC, P) ->
     <<?SCCP_MSGT_CC:8, DstLocalRef:24/big, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, OptBin/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_CREF, P) ->
     #sccp_msg_params_cref{dst_local_ref = DstLocalRef,
-                          refusal_cause = RefusalCause,
+                          refusal_cause = RefCause,
                           called_party_addr = CalledParty,
                           data = Data,
                           importance = Importance
@@ -557,6 +557,7 @@ encode_sccp_msgt(?SCCP_MSGT_CREF, P) ->
               {data, Data},
               {importance, Importance}],
     OptBin = encode_sccp_opts(Params),
+    RefusalCause = enc_refusal_cause(RefCause),
     <<?SCCP_MSGT_CREF:8, DstLocalRef:24/big, RefusalCause:8, OptBin/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_RLSD, P) ->
     #sccp_msg_params_rlsd{dst_local_ref = DstLocalRef,
@@ -653,8 +654,9 @@ encode_sccp_msgt(?SCCP_MSGT_EA, P) ->
 encode_sccp_msgt(?SCCP_MSGT_RSR, P) ->
     #sccp_msg_params_rsr{dst_local_ref = DstLocalRef,
                          src_local_ref = SrcLocalRef,
-                         reset_cause = ResetCause
+                         reset_cause = ResCause
                         } = P,
+    ResetCause = enc_reset_cause(ResCause),
     <<?SCCP_MSGT_RSR:8, DstLocalRef:24/big, SrcLocalRef:24/big, ResetCause:8>>;
 encode_sccp_msgt(?SCCP_MSGT_RSC, P) ->
     #sccp_msg_params_rsc{dst_local_ref = DstLocalRef,
@@ -665,7 +667,8 @@ encode_sccp_msgt(?SCCP_MSGT_ERR, P) ->
     #sccp_msg_params_err{dst_local_ref = DstLocalRef,
                          error_cause = ErrCause
                         } = P,
-    <<?SCCP_MSGT_ERR:8, DstLocalRef:24/big, ErrCause:8>>;
+    ErrorCause = enc_error_cause(ErrCause),
+    <<?SCCP_MSGT_ERR:8, DstLocalRef:24/big, ErrorCause:8>>;
 encode_sccp_msgt(?SCCP_MSGT_IT, P) ->
     #sccp_msg_params_it{dst_local_ref = DstLocalRef,
                         src_local_ref = SrcLocalRef,
@@ -982,3 +985,83 @@ enc_return_cause(hop_counter_violation) -> ?SCCP_CAUSE_RET_HOP_CTR_FAIL;
 enc_return_cause(segmentation_unsupported) -> ?SCCP_CAUSE_RET_SEG_NOT_SUPP;
 enc_return_cause(segmentation_failure) -> ?SCCP_CAUSE_RET_SEG_FAILURE;
 enc_return_cause({reserved, Ret}) -> Ret.
+
+dec_reset_cause(?SCCP_CAUSE_RES_ENDU_ORIGINATED) -> end_user_originated;
+dec_reset_cause(?SCCP_CAUSE_RES_SCCP_USER_ORIG) -> sccp_user_originated;
+dec_reset_cause(?SCCP_CAUSE_RES_MSGO_OOO_PS) -> msg_out_of_order_incorrect_ps;
+dec_reset_cause(?SCCP_CAUSE_RES_MSGO_OOO_PR) -> msg_out_of_order_incorrect_pr;
+dec_reset_cause(?SCCP_CAUSE_RES_MSGO_OO_WIND) -> remote_procedure_error_message_out_of_window;
+dec_reset_cause(?SCCP_CAUSE_RES_INC_PS_REINIT) -> remote_procedure_error_incorrect_ps_after_reinitialization;
+dec_reset_cause(?SCCP_CAUSE_RES_REM_GENERAL) -> remote_procedure_error_general;
+dec_reset_cause(?SCCP_CAUSE_RES_REM_OPERATIONAL) -> remote_end_user_operational;
+dec_reset_cause(?SCCP_CAUSE_RES_NET_OPERATIONAL) -> network_operational;
+dec_reset_cause(?SCCP_CAUSE_RES_ACC_OPERATIONAL) -> access_operational;
+dec_reset_cause(?SCCP_CAUSE_RES_NET_CONG) -> network_congestion;
+dec_reset_cause(?SCCP_CAUSE_RES_UNQUALIFIED) -> unqualified.
+
+enc_reset_cause(end_user_originated) -> ?SCCP_CAUSE_RES_ENDU_ORIGINATED;
+enc_reset_cause(sccp_user_originated) -> ?SCCP_CAUSE_RES_SCCP_USER_ORIG;
+enc_reset_cause(msg_out_of_order_incorrect_ps) -> ?SCCP_CAUSE_RES_MSGO_OOO_PS;
+enc_reset_cause(msg_out_of_order_incorrect_pr) -> ?SCCP_CAUSE_RES_MSGO_OOO_PR;
+enc_reset_cause(remote_procedure_error_message_out_of_window) -> ?SCCP_CAUSE_RES_MSGO_OO_WIND;
+enc_reset_cause(remote_procedure_error_incorrect_ps_after_reinitialization) -> ?SCCP_CAUSE_RES_INC_PS_REINIT;
+enc_reset_cause(remote_procedure_error_general) -> ?SCCP_CAUSE_RES_REM_GENERAL;
+enc_reset_cause(remote_end_user_operational) -> ?SCCP_CAUSE_RES_REM_OPERATIONAL;
+enc_reset_cause(network_operational) -> ?SCCP_CAUSE_RES_NET_OPERATIONAL;
+enc_reset_cause(access_operational) -> ?SCCP_CAUSE_RES_ACC_OPERATIONAL;
+enc_reset_cause(network_congestion) -> ?SCCP_CAUSE_RES_NET_CONG;
+enc_reset_cause(unqualified) -> ?SCCP_CAUSE_RES_UNQUALIFIED.
+
+dec_error_cause(?SCCP_CAUSE_ERR_LRN_UNASSIGNED) -> local_reference_number_mismatch_unassigned_destination;
+dec_error_cause(?SCCP_CAUSE_ERR_LRN_MISMATCH) -> local_reference_number_mismatch_inconsistent_source;
+dec_error_cause(?SCCP_CAUSE_ERR_PC_MISMATCH) -> point_code_mismatch;
+dec_error_cause(?SCCP_CAUSE_ERR_SCLASS_MISMATCH) -> service_class_mismatch;
+dec_error_cause(?SCCP_CAUSE_ERR_UNQUALIFIED) -> unqualified.
+
+enc_error_cause(local_reference_number_mismatch_unassigned_destination) -> ?SCCP_CAUSE_ERR_LRN_UNASSIGNED;
+enc_error_cause(local_reference_number_mismatch_inconsistent_source) -> ?SCCP_CAUSE_ERR_LRN_MISMATCH;
+enc_error_cause(point_code_mismatch) -> ?SCCP_CAUSE_ERR_PC_MISMATCH;
+enc_error_cause(service_class_mismatch) -> ?SCCP_CAUSE_ERR_SCLASS_MISMATCH;
+enc_error_cause(unqualified) -> ?SCCP_CAUSE_ERR_UNQUALIFIED.
+
+dec_refusal_cause(?SCCP_CAUSE_REF_ENDU_ORIGINATED) -> end_user_originated;
+dec_refusal_cause(?SCCP_CAUSE_REF_ENDU_CONGESTION) -> end_user_congestion;
+dec_refusal_cause(?SCCP_CAUSE_REF_ENDU_FAILURE) -> end_user_failure;
+dec_refusal_cause(?SCCP_CAUSE_REF_USER_ORIGINATED) -> sccp_user_originated;
+dec_refusal_cause(?SCCP_CAUSE_REF_DEST_UNKNOWN) -> destination_address_unknown;
+dec_refusal_cause(?SCCP_CAUSE_REF_DEST_INACCESS) -> destination_inaccess;
+dec_refusal_cause(?SCCP_CAUSE_REF_QOS_UNAVAIL_NTRANS) -> network_resource_qos_unavailable_non_transient;
+dec_refusal_cause(?SCCP_CAUSE_REF_QOS_UNAVAIL_TRANS) -> network_resource_qos_unavailable_transient;
+dec_refusal_cause(?SCCP_CAUSE_REF_ACCESS_FAIL) -> access_failure;
+dec_refusal_cause(?SCCP_CAUSE_REF_ACCESS_CONGESTION) -> access_congestion;
+dec_refusal_cause(?SCCP_CAUSE_REF_SUBSYS_FAILURE) -> subsystem_failure;
+dec_refusal_cause(?SCCP_CAUSE_REF_SUBSYS_CONGESTION) -> subsystem_congestion;
+dec_refusal_cause(?SCCP_CAUSE_REF_EXP_CONN_EST_TMR) -> expiration_of_the_connection_established_timer;
+dec_refusal_cause(?SCCP_CAUSE_REF_INCOMP_USER_DATA) -> incompatible_user_data;
+dec_refusal_cause(?SCCP_CAUSE_REF_RESERVED) -> reserved;
+dec_refusal_cause(?SCCP_CAUSE_REF_UNQUALIFIED) -> unqualified;
+dec_refusal_cause(?SCCP_CAUSE_REF_HOP_COUNTER_VIOL) -> hop_counter_violation;
+dec_refusal_cause(?SCCP_CAUSE_REF_SCCP_FAIL) -> sccp_failure;
+dec_refusal_cause(?SCCP_CAUSE_REF_NO_GTT_FOR_NATURE) -> no_translation_for_an_address_of_such_nature;
+dec_refusal_cause(?SCCP_CAUSE_REF_UNEQUIPPED_USER) -> unequipped_user.
+
+enc_refusal_cause(end_user_originated) -> ?SCCP_CAUSE_REF_ENDU_ORIGINATED;
+enc_refusal_cause(end_user_congestion) -> ?SCCP_CAUSE_REF_ENDU_CONGESTION;
+enc_refusal_cause(end_user_failure) -> ?SCCP_CAUSE_REF_ENDU_FAILURE;
+enc_refusal_cause(sccp_user_originated) -> ?SCCP_CAUSE_REF_USER_ORIGINATED;
+enc_refusal_cause(destination_address_unknown) -> ?SCCP_CAUSE_REF_DEST_UNKNOWN;
+enc_refusal_cause(destination_inaccess) -> ?SCCP_CAUSE_REF_DEST_INACCESS;
+enc_refusal_cause(network_resource_qos_unavailable_non_transient) -> ?SCCP_CAUSE_REF_QOS_UNAVAIL_NTRANS;
+enc_refusal_cause(network_resource_qos_unavailable_transient) -> ?SCCP_CAUSE_REF_QOS_UNAVAIL_TRANS;
+enc_refusal_cause(access_failure) -> ?SCCP_CAUSE_REF_ACCESS_FAIL;
+enc_refusal_cause(access_congestion) -> ?SCCP_CAUSE_REF_ACCESS_CONGESTION;
+enc_refusal_cause(subsystem_failure) -> ?SCCP_CAUSE_REF_SUBSYS_FAILURE;
+enc_refusal_cause(subsystem_congestion) -> ?SCCP_CAUSE_REF_SUBSYS_CONGESTION;
+enc_refusal_cause(expiration_of_the_connection_established_timer) -> ?SCCP_CAUSE_REF_EXP_CONN_EST_TMR;
+enc_refusal_cause(incompatible_user_data) -> ?SCCP_CAUSE_REF_INCOMP_USER_DATA;
+enc_refusal_cause(reserved) -> ?SCCP_CAUSE_REF_RESERVED;
+enc_refusal_cause(unqualified) -> ?SCCP_CAUSE_REF_UNQUALIFIED;
+enc_refusal_cause(hop_counter_violation) -> ?SCCP_CAUSE_REF_HOP_COUNTER_VIOL;
+enc_refusal_cause(sccp_failure) -> ?SCCP_CAUSE_REF_SCCP_FAIL;
+enc_refusal_cause(no_translation_for_an_address_of_such_nature) -> ?SCCP_CAUSE_REF_NO_GTT_FOR_NATURE;
+enc_refusal_cause(unequipped_user) -> ?SCCP_CAUSE_REF_UNEQUIPPED_USER.
