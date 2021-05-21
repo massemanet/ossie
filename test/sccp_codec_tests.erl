@@ -23,7 +23,7 @@
 -define(SCCP_UDT_DEC,
         #sccp_msg{msg_type = sccp_msgt_udt,
                   parameters = #sccp_msg_params_udt{
-                                  protocol_class = {0,0},
+                                  protocol_class = {basic_connectionless, discard_on_error},
                                   called_party_addr = {sccp_addr,0,0,undefined,7,
                                                        {global_title,4,4,0,undefined,1,
                                                         [3,5,4,8,9,0,0,0,7,1]}},
@@ -57,7 +57,7 @@
 -define(SCCP_XUDT_DEC,
         #sccp_msg{msg_type = sccp_msgt_xudt,
                   parameters = #sccp_msg_params_xudt{
-                                  protocol_class = {1,8},
+                                  protocol_class = {sequenced_connectionless, return_on_error},
                                   hop_counter = 15,
                                   called_party_addr = {sccp_addr,0,0,undefined,6,
                                                        {global_title,4,4,0,undefined,1,

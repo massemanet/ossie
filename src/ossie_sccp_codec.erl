@@ -35,8 +35,7 @@
 -author('Harald Welte <laforge@gnumonks.org>').
 -include("../include/sccp.hrl").
 
--export([parse_sccp_msg/1, encode_sccp_msg/1, encode_sccp_msgt/2,
-         is_connectionless/1]).
+-export([parse_sccp_msg/1, encode_sccp_msg/1, encode_sccp_msgt/2]).
 
 -export([gen_gt_helper/1, gen_addr_helper/2, gen_addr_helper/3]).
 
@@ -158,7 +157,7 @@ parse_sccp_msgt(sccp_msgt_cr, DataBin) ->
     OptList = parse_sccp_opts(OptBin, []),
     %% build parsed list of message
     #sccp_msg_params_cr{src_local_ref = SrcLocalRef,
-                        protocol_class = {ProtoClass, PCOpt},
+                        protocol_class = dec_protocol_class_and_options({ProtoClass, PCOpt}),
                         called_party_addr = CalledPartyDec,
                         credit = proplists:get_value(credit, OptList),
                         calling_party_addr = proplists:get_value(calling_party_addr, OptList),
@@ -175,7 +174,7 @@ parse_sccp_msgt(sccp_msgt_cc, DataBin) ->
     %% build parsed list of message
     #sccp_msg_params_cc{dst_local_ref = DstLocalRef,
                         src_local_ref = SrcLocalRef,
-                        protocol_class = {ProtoClass, PCOpt},
+                        protocol_class = dec_protocol_class_and_options({ProtoClass, PCOpt}),
                         credit = proplists:get_value(credit, OptList),
                         called_party_addr = proplists:get_value(called_party_addr, OptList),
                         data = proplists:get_value(data, OptList),
@@ -245,7 +244,7 @@ parse_sccp_msgt(sccp_msgt_udt, DataBin) ->
     CallingPartyDec = parse_sccp_addr(CallingParty),
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
-    #sccp_msg_params_udt{protocol_class = {ProtoClass, PCOpt},
+    #sccp_msg_params_udt{protocol_class = dec_protocol_class_and_options({ProtoClass, PCOpt}),
                          called_party_addr = CalledPartyDec,
                          calling_party_addr = CallingPartyDec,
                          data = UserData
@@ -297,7 +296,7 @@ parse_sccp_msgt(sccp_msgt_it, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big, PCOpt: 4, ProtoClass:4, SegmSeq:16, Credit:8>> = DataBin,
     #sccp_msg_params_it{dst_local_ref = DstLocalRef,
                         src_local_ref = SrcLocalRef,
-                        protocol_class = {ProtoClass, PCOpt},
+                        protocol_class = dec_protocol_class_and_options({ProtoClass, PCOpt}),
                         seq_segm = SegmSeq,
                         credit = Credit
                        };
@@ -317,7 +316,7 @@ parse_sccp_msgt(sccp_msgt_xudt, DataBin) ->
                  _ -> binary:part(Remain, OptPtr-1, byte_size(Remain)-(OptPtr-1))
              end,
     OptList = parse_sccp_opts(OptBin, []),
-    #sccp_msg_params_xudt{protocol_class = {ProtoClass, PCOpt},
+    #sccp_msg_params_xudt{protocol_class = dec_protocol_class_and_options({ProtoClass, PCOpt}),
                           hop_counter = HopCounter,
                           called_party_addr = CalledPartyDec,
                           calling_party_addr = CallingPartyDec,
@@ -365,7 +364,7 @@ parse_sccp_msgt(sccp_msgt_ludt, DataBin) ->
                  _ -> binary:part(Remain, OptPtr-1, byte_size(Remain)-(OptPtr-1))
              end,
     OptList = parse_sccp_opts(OptBin, []),
-    #sccp_msg_params_ludt{protocol_class = {ProtoClass, PCOpt},
+    #sccp_msg_params_ludt{protocol_class = dec_protocol_class_and_options({ProtoClass, PCOpt}),
                           hop_counter = HopCounter,
                           called_party_addr = CalledPartyDec,
                           calling_party_addr = CallingPartyDec,
@@ -512,7 +511,7 @@ e_sccp_opts([CurOpt|OptPropList], OptEnc) ->
 
 encode_sccp_msgt(?SCCP_MSGT_CR, P) ->
     #sccp_msg_params_cr{src_local_ref = SrcLocalRef,
-                        protocol_class = {ProtoClass, PCOpt},
+                        protocol_class = ProtocolClassOpts,
                         called_party_addr = CalledParty,
                         credit = Credit,
                         calling_party_addr = CallingParty,
@@ -529,11 +528,12 @@ encode_sccp_msgt(?SCCP_MSGT_CR, P) ->
               {hop_counter, HopCounter},
               {importance, Importance}],
     OptBin = encode_sccp_opts(Params),
+    {ProtoClass, PCOpt} = enc_protocol_class_and_options(ProtocolClassOpts),
     <<?SCCP_MSGT_CR:8, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, 2:8, PtrOpt:8, CalledPartyLen:8, CalledPartyEnc/binary, OptBin/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_CC, P) ->
     #sccp_msg_params_cc{dst_local_ref = DstLocalRef,
                         src_local_ref = SrcLocalRef,
-                        protocol_class = {ProtoClass, PCOpt},
+                        protocol_class = ProtocolClassOpts,
                         credit = Credit,
                         called_party_addr = CalledParty,
                         data = Data,
@@ -544,6 +544,7 @@ encode_sccp_msgt(?SCCP_MSGT_CC, P) ->
               {data, Data},
               {importance, Importance}],
     OptBin = encode_sccp_opts(Params),
+    {ProtoClass, PCOpt} = enc_protocol_class_and_options(ProtocolClassOpts),
     <<?SCCP_MSGT_CC:8, DstLocalRef:24/big, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, OptBin/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_CREF, P) ->
     #sccp_msg_params_cref{dst_local_ref = DstLocalRef,
@@ -596,7 +597,7 @@ encode_sccp_msgt(?SCCP_MSGT_AK, P) ->
                        } = P,
     <<?SCCP_MSGT_AK:8, DstLocalRef:24/big, RxSeqnr:8, Credit:8>>;
 encode_sccp_msgt(?SCCP_MSGT_UDT, P) ->
-    #sccp_msg_params_udt{protocol_class = {ProtoClass, PCOpt},
+    #sccp_msg_params_udt{protocol_class = ProtocolClassOpts,
                          called_party_addr = CalledParty,
                          calling_party_addr = CallingParty,
                          data = Data
@@ -614,6 +615,7 @@ encode_sccp_msgt(?SCCP_MSGT_UDT, P) ->
     Remain = <<CalledPartyLen:8, CalledPartyEnc/binary,
                CallingPartyLen:8, CallingPartyEnc/binary,
                UserDataLen:8, UserData/binary>>,
+    {ProtoClass, PCOpt} = enc_protocol_class_and_options(ProtocolClassOpts),
     <<?SCCP_MSGT_UDT:8, PCOpt:4, ProtoClass:4, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, Remain/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_UDTS, P) ->
     #sccp_msg_params_udts{return_cause = ReturnCause,
@@ -666,13 +668,14 @@ encode_sccp_msgt(?SCCP_MSGT_ERR, P) ->
 encode_sccp_msgt(?SCCP_MSGT_IT, P) ->
     #sccp_msg_params_it{dst_local_ref = DstLocalRef,
                         src_local_ref = SrcLocalRef,
-                        protocol_class = {ProtoClass, PCOpt},
+                        protocol_class = ProtocolClassOpts,
                         seq_segm = SeqSegm,
                         credit = Credit
                        } = P,
+    {ProtoClass, PCOpt} = enc_protocol_class_and_options(ProtocolClassOpts),
     <<?SCCP_MSGT_IT:8, DstLocalRef:24/big, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, SeqSegm:16, Credit:8>>;
 encode_sccp_msgt(?SCCP_MSGT_XUDT, P) ->
-    #sccp_msg_params_xudt{protocol_class = {ProtoClass, PCOpt},
+    #sccp_msg_params_xudt{protocol_class = ProtocolClassOpts,
                           hop_counter = HopCounter,
                           called_party_addr = CalledParty,
                           calling_party_addr = CallingParty,
@@ -699,6 +702,7 @@ encode_sccp_msgt(?SCCP_MSGT_XUDT, P) ->
                  %% after one pointer and called/calling parties and data, all with lengths
                  _ -> 1 + (1 + CalledPartyLen) + (1 + CallingPartyLen) + (1 + DataLen)
              end,
+    {ProtoClass, PCOpt} = enc_protocol_class_and_options(ProtocolClassOpts),
     <<?SCCP_MSGT_XUDT:8, PCOpt:4, ProtoClass:4, HopCounter:8,
       PtrCalledParty:8, PtrCallingParty:8, PtrData:8, PtrOpt:8,
       CalledPartyLen:8, CalledPartyEnc/binary,
@@ -740,7 +744,7 @@ encode_sccp_msgt(?SCCP_MSGT_XUDTS, P) ->
       DataLen:8, Data/binary,
       OptBin/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_LUDT, P) ->
-    #sccp_msg_params_ludt{protocol_class = {ProtoClass, PCOpt},
+    #sccp_msg_params_ludt{protocol_class = ProtocolClassOpts,
                           hop_counter = HopCounter,
                           called_party_addr = CalledParty,
                           calling_party_addr = CallingParty,
@@ -767,6 +771,7 @@ encode_sccp_msgt(?SCCP_MSGT_LUDT, P) ->
                  %% after one pointer and called/calling parties and data, all with lengths
                  _ -> 1 + (1 + CalledPartyLen) + (1 + CallingPartyLen) + (1 + DataLen)
              end,
+    {ProtoClass, PCOpt} = enc_protocol_class_and_options(ProtocolClassOpts),
     <<?SCCP_MSGT_LUDT:8, PCOpt:4, ProtoClass:4, HopCounter:8,
       PtrCalledParty:8, PtrCallingParty:8, PtrData:8, PtrOpt:8,
       CalledPartyLen:8, CalledPartyEnc/binary,
@@ -812,21 +817,6 @@ encode_sccp_msgt(?SCCP_MSGT_LUDTS, P) ->
 encode_sccp_msg(#sccp_msg{msg_type = MsgType, parameters = Params}) ->
     MsgT = enc_msg_type(MsgType),
     encode_sccp_msgt(MsgT, Params).
-
-%% is the supplied message type a connectionless message?
-is_connectionless(#sccp_msg{msg_type = MsgType}) ->
-    is_connectionless(MsgType);
-is_connectionless(MsgType) ->
-    case MsgType of
-        ?SCCP_MSGT_UDT -> true;
-        ?SCCP_MSGT_UDTS -> true;
-        ?SCCP_MSGT_XUDT -> true;
-        ?SCCP_MSGT_XUDTS -> true;
-        ?SCCP_MSGT_LUDT -> true;
-        ?SCCP_MSGT_LUDTS -> true;
-        _ -> false
-    end.
-
 
 gen_gt_helper(Number) when is_list(Number) ->
     #global_title{gti=?SCCP_GTI_NAT_ONLY,
@@ -937,3 +927,21 @@ enc_msg_type(sccp_msgt_xudt) -> ?SCCP_MSGT_XUDT;
 enc_msg_type(sccp_msgt_xudts) -> ?SCCP_MSGT_XUDTS;
 enc_msg_type(sccp_msgt_ludt) -> ?SCCP_MSGT_LUDT;
 enc_msg_type(sccp_msgt_ludts) -> ?SCCP_MSGT_LUDTS.
+
+dec_protocol_class_and_options({0, 0}) -> {basic_connectionless, discard_on_error};
+dec_protocol_class_and_options({0, 8}) -> {basic_connectionless, return_on_error};
+dec_protocol_class_and_options({0, S}) -> {basic_connectionless, {spare, S}};
+dec_protocol_class_and_options({1, 0}) -> {sequenced_connectionless, discard_on_error};
+dec_protocol_class_and_options({1, 8}) -> {sequenced_connectionless, return_on_error};
+dec_protocol_class_and_options({1, S}) -> {sequenced_connectionless, {spare, S}};
+dec_protocol_class_and_options({2, S}) -> {basic_connection_oriented, {spare, S}};
+dec_protocol_class_and_options({3, S}) -> {flow_control_connection_oriented, {spare, S}}.
+
+enc_protocol_class_and_options({basic_connectionless, discard_on_error}) -> {0, 0};
+enc_protocol_class_and_options({basic_connectionless, return_on_error}) -> {0, 8};
+enc_protocol_class_and_options({basic_connectionless, {spare, S}}) -> {0, S};
+enc_protocol_class_and_options({sequenced_connectionless, discard_on_error}) -> {1, 0};
+enc_protocol_class_and_options({sequenced_connectionless, return_on_error}) -> {1, 8};
+enc_protocol_class_and_options({sequenced_connectionless, {spare, S}}) -> {1, S};
+enc_protocol_class_and_options({basic_connection_oriented, {spare, S}}) -> {2, S};
+enc_protocol_class_and_options({flow_control_connection_oriented, {spare, S}}) -> {3, S}.
