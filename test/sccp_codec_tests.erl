@@ -87,7 +87,7 @@
 -define(SCCP_XUDTS_DEC,
         #sccp_msg{msg_type = sccp_msgt_xudts,
                   parameters = #sccp_msg_params_xudts{
-                                  return_cause = 3,
+                                  return_cause = subsystem_failure,
                                   hop_counter = 15,
                                   called_party_addr = {sccp_addr,0,0,undefined,6,
                                                        {global_title,4,4,0,undefined,1,

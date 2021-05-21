@@ -260,7 +260,7 @@ parse_sccp_msgt(sccp_msgt_udts, DataBin) ->
     CallingPartyDec = parse_sccp_addr(CallingParty),
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
-    #sccp_msg_params_udts{return_cause = ReturnCause,
+    #sccp_msg_params_udts{return_cause = dec_return_cause(ReturnCause),
                           called_party_addr = CalledPartyDec,
                           calling_party_addr = CallingPartyDec,
                           data = UserData
@@ -340,7 +340,7 @@ parse_sccp_msgt(sccp_msgt_xudts, DataBin) ->
                  _ -> binary:part(Remain, OptPtr-1, byte_size(Remain)-(OptPtr-1))
              end,
     OptList = parse_sccp_opts(OptBin, []),
-    #sccp_msg_params_xudts{return_cause = ReturnCause,
+    #sccp_msg_params_xudts{return_cause = dec_return_cause(ReturnCause),
                            hop_counter = HopCounter,
                            called_party_addr = CalledPartyDec,
                            calling_party_addr = CallingPartyDec,
@@ -388,7 +388,7 @@ parse_sccp_msgt(sccp_msgt_ludts, DataBin) ->
                  _ -> binary:part(Remain, OptPtr-1, byte_size(Remain)-(OptPtr-1))
              end,
     OptList = parse_sccp_opts(OptBin, []),
-    #sccp_msg_params_ludts{return_cause = ReturnCause,
+    #sccp_msg_params_ludts{return_cause = dec_return_cause(ReturnCause),
                            hop_counter = HopCounter,
                            called_party_addr = CalledPartyDec,
                            calling_party_addr = CallingPartyDec,
@@ -636,7 +636,8 @@ encode_sccp_msgt(?SCCP_MSGT_UDTS, P) ->
     Remain = <<CalledPartyLen:8, CalledPartyEnc/binary,
                CallingPartyLen:8, CallingPartyEnc/binary,
                UserDataLen:8, UserData/binary>>,
-    <<?SCCP_MSGT_UDTS:8, ReturnCause:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, Remain/binary>>;
+    RetCause = enc_return_cause(ReturnCause),
+    <<?SCCP_MSGT_UDTS:8, RetCause:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, Remain/binary>>;
 encode_sccp_msgt(?SCCP_MSGT_ED, P) ->
     #sccp_msg_params_ed{dst_local_ref = DstLocalRef,
                         data = Data
@@ -737,7 +738,8 @@ encode_sccp_msgt(?SCCP_MSGT_XUDTS, P) ->
                  %% after one pointer and called/calling parties and data, all with lengths
                  _ -> 1 + (1 + CalledPartyLen) + (1 + CallingPartyLen) + (1 + DataLen)
              end,
-    <<?SCCP_MSGT_XUDTS:8, ReturnCause:8, HopCounter:8,
+    RetCause = enc_return_cause(ReturnCause),
+    <<?SCCP_MSGT_XUDTS:8, RetCause:8, HopCounter:8,
       PtrCalledParty:8, PtrCallingParty:8, PtrData:8, PtrOpt:8,
       CalledPartyLen:8, CalledPartyEnc/binary,
       CallingPartyLen:8, CallingPartyEnc/binary,
@@ -806,7 +808,8 @@ encode_sccp_msgt(?SCCP_MSGT_LUDTS, P) ->
                  %% after one pointer and called/calling parties and data, all with lengths
                  _ -> 1 + (1 + CalledPartyLen) + (1 + CallingPartyLen) + (1 + DataLen)
              end,
-    <<?SCCP_MSGT_LUDTS:8, ReturnCause:8, HopCounter:8,
+    RetCause = enc_return_cause(ReturnCause),
+    <<?SCCP_MSGT_LUDTS:8, RetCause:8, HopCounter:8,
       PtrCalledParty:8, PtrCallingParty:8, PtrData:8, PtrOpt:8,
       CalledPartyLen:8, CalledPartyEnc/binary,
       CallingPartyLen:8, CallingPartyEnc/binary,
@@ -945,3 +948,37 @@ enc_protocol_class_and_options({sequenced_connectionless, return_on_error}) -> {
 enc_protocol_class_and_options({sequenced_connectionless, {spare, S}}) -> {1, S};
 enc_protocol_class_and_options({basic_connection_oriented, {spare, S}}) -> {2, S};
 enc_protocol_class_and_options({flow_control_connection_oriented, {spare, S}}) -> {3, S}.
+
+dec_return_cause(?SCCP_CAUSE_RET_NOTRANS_NATURE) -> no_translation_of_addr_nature;
+dec_return_cause(?SCCP_CAUSE_RET_NOTRANS_ADDR) ->  no_translation_of_addr;
+dec_return_cause(?SCCP_CAUSE_RET_SUBSYS_CONG) -> subsystem_congestion;
+dec_return_cause(?SCCP_CAUSE_RET_SUBSYS_FAILURE) -> subsystem_failure;
+dec_return_cause(?SCCP_CAUSE_RET_UNEQUIP_USER) -> unequipped_user;
+dec_return_cause(?SCCP_CAUSE_RET_MTP_FAILURE) -> network_failure;
+dec_return_cause(?SCCP_CAUSE_RET_NET_CONG) -> network_congestion;
+dec_return_cause(?SCCP_CAUSE_RET_UNQUALIFIED) -> unqualified;
+dec_return_cause(?SCCP_CAUSE_RET_ERR_MSG_TRANSP) -> error_message_transport;
+dec_return_cause(?SCCP_CAUSE_RET_ERR_LOCAL_PROC) -> error_local_processing;
+dec_return_cause(?SCCP_CAUSE_RET_DEST_NO_REASS) -> destination_cannot_reassemble;
+dec_return_cause(?SCCP_CAUSE_RET_SCCP_FAILURE) -> sccp_failure;
+dec_return_cause(?SCCP_CAUSE_RET_HOP_CTR_FAIL) -> hop_counter_violation;
+dec_return_cause(?SCCP_CAUSE_RET_SEG_NOT_SUPP) -> segmentation_unsupported;
+dec_return_cause(?SCCP_CAUSE_RET_SEG_FAILURE) -> segmentation_failure;
+dec_return_cause(Ret) -> {reserved, Ret}.
+
+enc_return_cause(no_translation_of_addr_nature) -> ?SCCP_CAUSE_RET_NOTRANS_NATURE;
+enc_return_cause(no_translation_of_addr) -> ?SCCP_CAUSE_RET_NOTRANS_ADDR;
+enc_return_cause(subsystem_congestion) -> ?SCCP_CAUSE_RET_SUBSYS_CONG;
+enc_return_cause(subsystem_failure) -> ?SCCP_CAUSE_RET_SUBSYS_FAILURE;
+enc_return_cause(unequipped_user) -> ?SCCP_CAUSE_RET_UNEQUIP_USER;
+enc_return_cause(network_failure) -> ?SCCP_CAUSE_RET_MTP_FAILURE;
+enc_return_cause(network_congestion) -> ?SCCP_CAUSE_RET_NET_CONG;
+enc_return_cause(unqualified) -> ?SCCP_CAUSE_RET_UNQUALIFIED;
+enc_return_cause(error_message_transport) -> ?SCCP_CAUSE_RET_ERR_MSG_TRANSP;
+enc_return_cause(error_local_processing) -> ?SCCP_CAUSE_RET_ERR_LOCAL_PROC;
+enc_return_cause(destination_cannot_reassemble) -> ?SCCP_CAUSE_RET_DEST_NO_REASS;
+enc_return_cause(sccp_failure) -> ?SCCP_CAUSE_RET_SCCP_FAILURE;
+enc_return_cause(hop_counter_violation) -> ?SCCP_CAUSE_RET_HOP_CTR_FAIL;
+enc_return_cause(segmentation_unsupported) -> ?SCCP_CAUSE_RET_SEG_NOT_SUPP;
+enc_return_cause(segmentation_failure) -> ?SCCP_CAUSE_RET_SEG_FAILURE;
+enc_return_cause({reserved, Ret}) -> Ret.
