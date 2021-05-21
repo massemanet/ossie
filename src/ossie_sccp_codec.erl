@@ -145,7 +145,7 @@ parse_sccp_opts(OptBin, OptList) ->
 
 
 %% Parse incoming SCCP message, one function for every message type
-parse_sccp_msgt(?SCCP_MSGT_CR, DataBin) ->
+parse_sccp_msgt(sccp_msgt_cr, DataBin) ->
     %% first get the fixed part
     <<_:8, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, RemainVar/binary >> = DataBin,
     %% variable length fixed part
@@ -166,7 +166,7 @@ parse_sccp_msgt(?SCCP_MSGT_CR, DataBin) ->
                         hop_counter = proplists:get_value(hop_counter, OptList),
                         importance = proplists:get_value(importance, OptList)
                        };
-parse_sccp_msgt(?SCCP_MSGT_CC, DataBin) ->
+parse_sccp_msgt(sccp_msgt_cc, DataBin) ->
     %% first get the fixed part
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, PtrOpt:8, Remain/binary >> = DataBin,
     %% optional part
@@ -181,7 +181,7 @@ parse_sccp_msgt(?SCCP_MSGT_CC, DataBin) ->
                         data = proplists:get_value(data, OptList),
                         importance = proplists:get_value(importance,  OptList)
                        };
-parse_sccp_msgt(?SCCP_MSGT_CREF, DataBin) ->
+parse_sccp_msgt(sccp_msgt_cref, DataBin) ->
     %% first get the fixed part
     <<_:8, DstLocalRef:24/big, RefusalCause:8, Remain/binary >> = DataBin,
     %% optional part
@@ -193,7 +193,7 @@ parse_sccp_msgt(?SCCP_MSGT_CREF, DataBin) ->
                           data = proplists:get_value(data, OptList),
                           importance = proplists:get_value(importance, OptList)
                          };
-parse_sccp_msgt(?SCCP_MSGT_RLSD, DataBin) ->
+parse_sccp_msgt(sccp_msgt_rlsd, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big, ReleaseCause:8, Remain/binary >> = DataBin,
     %% optional part
     OptList = parse_sccp_opts(Remain, []),
@@ -204,13 +204,13 @@ parse_sccp_msgt(?SCCP_MSGT_RLSD, DataBin) ->
                           data = proplists:get_value(data, OptList),
                           importance = proplists:get_value(importance, OptList)
                          };
-parse_sccp_msgt(?SCCP_MSGT_RLC, DataBin) ->
+parse_sccp_msgt(sccp_msgt_rlc, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big>> = DataBin,
     %% build parsed list of message
     #sccp_msg_params_rlc{dst_local_ref = DstLocalRef,
                          src_local_ref = SrcLocalRef
                         };
-parse_sccp_msgt(?SCCP_MSGT_DT1, DataBin) ->
+parse_sccp_msgt(sccp_msgt_dt1, DataBin) ->
     <<_:8, DstLocalRef:24/big, SegmReass:8, DataPtr:8, Remain/binary >> = DataBin,
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
@@ -219,7 +219,7 @@ parse_sccp_msgt(?SCCP_MSGT_DT1, DataBin) ->
                          segm_reass = SegmReass,
                          data = UserData
                         };
-parse_sccp_msgt(?SCCP_MSGT_DT2, DataBin) ->
+parse_sccp_msgt(sccp_msgt_dt2, DataBin) ->
     <<_:8, DstLocalRef:24/big, SeqSegm:16, DataPtr:8, Remain/binary >> = DataBin,
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
@@ -228,13 +228,13 @@ parse_sccp_msgt(?SCCP_MSGT_DT2, DataBin) ->
                          seq_segm = SeqSegm,
                          data = UserData
                         };
-parse_sccp_msgt(?SCCP_MSGT_AK, DataBin) ->
+parse_sccp_msgt(sccp_msgt_ak, DataBin) ->
     <<_:8, DstLocalRef:24/big, RxSeqnr:8, Credit:8>> = DataBin,
     #sccp_msg_params_ak{dst_local_ref = DstLocalRef,
                         rx_seq_nr = RxSeqnr,
                         credit = Credit
                        };
-parse_sccp_msgt(?SCCP_MSGT_UDT, DataBin) ->
+parse_sccp_msgt(sccp_msgt_udt, DataBin) ->
     <<_:8, PCOpt:4, ProtoClass:4, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, Remain/binary >> = DataBin,
     %% variable part
     CalledPartyLen = binary:at(Remain, CalledPartyPtr-3),
@@ -250,7 +250,7 @@ parse_sccp_msgt(?SCCP_MSGT_UDT, DataBin) ->
                          calling_party_addr = CallingPartyDec,
                          data = UserData
                         };
-parse_sccp_msgt(?SCCP_MSGT_UDTS, DataBin) ->
+parse_sccp_msgt(sccp_msgt_udts, DataBin) ->
     <<_:8, ReturnCause:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, Remain/binary >> = DataBin,
     %% variable part
     CalledPartyLen = binary:at(Remain, CalledPartyPtr-3),
@@ -266,34 +266,34 @@ parse_sccp_msgt(?SCCP_MSGT_UDTS, DataBin) ->
                           calling_party_addr = CallingPartyDec,
                           data = UserData
                          };
-parse_sccp_msgt(?SCCP_MSGT_ED, DataBin) ->
+parse_sccp_msgt(sccp_msgt_ed, DataBin) ->
     <<_:8, DstLocalRef:24/big, DataPtr:8, Remain/binary>> = DataBin,
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
     #sccp_msg_params_ed{dst_local_ref = DstLocalRef,
                         data = UserData
                        };
-parse_sccp_msgt(?SCCP_MSGT_EA, DataBin) ->
+parse_sccp_msgt(sccp_msgt_ea, DataBin) ->
     <<_:8, DstLocalRef:24/big>> = DataBin,
     #sccp_msg_params_ea{dst_local_ref = DstLocalRef
                        };
-parse_sccp_msgt(?SCCP_MSGT_RSR, DataBin) ->
+parse_sccp_msgt(sccp_msgt_rsr, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big, ResetCause:8>> = DataBin,
     #sccp_msg_params_rsr{dst_local_ref = DstLocalRef,
                          src_local_ref = SrcLocalRef,
                          reset_cause = ResetCause
                         };
-parse_sccp_msgt(?SCCP_MSGT_RSC, DataBin) ->
+parse_sccp_msgt(sccp_msgt_rsc, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big>> = DataBin,
     #sccp_msg_params_rsc{dst_local_ref = DstLocalRef,
                          src_local_ref = SrcLocalRef
                         };
-parse_sccp_msgt(?SCCP_MSGT_ERR, DataBin) ->
+parse_sccp_msgt(sccp_msgt_err, DataBin) ->
     <<_:8, DstLocalRef:24/big, ErrCause:8>> = DataBin,
     #sccp_msg_params_err{dst_local_ref = DstLocalRef,
                          error_cause = ErrCause
                         };
-parse_sccp_msgt(?SCCP_MSGT_IT, DataBin) ->
+parse_sccp_msgt(sccp_msgt_it, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big, PCOpt: 4, ProtoClass:4, SegmSeq:16, Credit:8>> = DataBin,
     #sccp_msg_params_it{dst_local_ref = DstLocalRef,
                         src_local_ref = SrcLocalRef,
@@ -301,7 +301,7 @@ parse_sccp_msgt(?SCCP_MSGT_IT, DataBin) ->
                         seq_segm = SegmSeq,
                         credit = Credit
                        };
-parse_sccp_msgt(?SCCP_MSGT_XUDT, DataBin) ->
+parse_sccp_msgt(sccp_msgt_xudt, DataBin) ->
     <<_:8, PCOpt: 4, ProtoClass:4, HopCounter:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, OptPtr:8, Remain/binary>> = DataBin,
     CalledPartyLen = binary:at(Remain, CalledPartyPtr-4),
     CalledParty = binary:part(Remain, CalledPartyPtr-4+1, CalledPartyLen),
@@ -325,7 +325,7 @@ parse_sccp_msgt(?SCCP_MSGT_XUDT, DataBin) ->
                           segmentation = proplists:get_value(segmentation, OptList),
                           importance = proplists:get_value(importance, OptList)
                          };
-parse_sccp_msgt(?SCCP_MSGT_XUDTS, DataBin) ->
+parse_sccp_msgt(sccp_msgt_xudts, DataBin) ->
     <<_:8, ReturnCause:8, HopCounter:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, OptPtr:8, Remain/binary>> = DataBin,
     CalledPartyLen = binary:at(Remain, CalledPartyPtr-4),
     CalledParty = binary:part(Remain, CalledPartyPtr-4+1, CalledPartyLen),
@@ -349,7 +349,7 @@ parse_sccp_msgt(?SCCP_MSGT_XUDTS, DataBin) ->
                            segmentation = proplists:get_value(segmentation, OptList),
                            importance = proplists:get_value(importance, OptList)
                           };
-parse_sccp_msgt(?SCCP_MSGT_LUDT, DataBin) ->
+parse_sccp_msgt(sccp_msgt_ludt, DataBin) ->
     <<_:8, PCOpt: 4, ProtoClass:4, HopCounter:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, OptPtr:8, Remain/binary>> = DataBin,
     CalledPartyLen = binary:at(Remain, CalledPartyPtr-4),
     CalledParty = binary:part(Remain, CalledPartyPtr-4+1, CalledPartyLen),
@@ -373,7 +373,7 @@ parse_sccp_msgt(?SCCP_MSGT_LUDT, DataBin) ->
                           segmentation = proplists:get_value(segmentation, OptList),
                           importance = proplists:get_value(importance, OptList)
                          };
-parse_sccp_msgt(?SCCP_MSGT_LUDTS, DataBin) ->
+parse_sccp_msgt(sccp_msgt_ludts, DataBin) ->
     <<_:8, ReturnCause:8, HopCounter:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, OptPtr:8, Remain/binary>> = DataBin,
     CalledPartyLen = binary:at(Remain, CalledPartyPtr-4),
     CalledParty = binary:part(Remain, CalledPartyPtr-4+1, CalledPartyLen),
@@ -400,7 +400,7 @@ parse_sccp_msgt(?SCCP_MSGT_LUDTS, DataBin) ->
 
 %% process one incoming SCCP message
 parse_sccp_msg(DataBin) ->
-    MsgType = binary:first(DataBin),
+    MsgType = dec_msg_type(binary:first(DataBin)),
     Parsed = parse_sccp_msgt(MsgType, DataBin),
     {ok, #sccp_msg{msg_type = MsgType, parameters = Parsed}}.
 
@@ -810,7 +810,8 @@ encode_sccp_msgt(?SCCP_MSGT_LUDTS, P) ->
 
 %% encode one sccp message data structure into the on-wire format
 encode_sccp_msg(#sccp_msg{msg_type = MsgType, parameters = Params}) ->
-    encode_sccp_msgt(MsgType, Params).
+    MsgT = enc_msg_type(MsgType),
+    encode_sccp_msgt(MsgT, Params).
 
 %% is the supplied message type a connectionless message?
 is_connectionless(#sccp_msg{msg_type = MsgType}) ->
@@ -894,3 +895,45 @@ atom_to_opt(Atom) ->
         long_data       -> ?SCCP_PNC_LONG_DATA;
         Foo             -> Foo
     end.
+
+dec_msg_type(?SCCP_MSGT_CR) -> sccp_msgt_cr;
+dec_msg_type(?SCCP_MSGT_CC) -> sccp_msgt_cc;
+dec_msg_type(?SCCP_MSGT_CREF) -> sccp_msgt_cref;
+dec_msg_type(?SCCP_MSGT_RLSD) -> sccp_msgt_rlsd;
+dec_msg_type(?SCCP_MSGT_RLC) -> sccp_msgt_rlc;
+dec_msg_type(?SCCP_MSGT_DT1) -> sccp_msgt_dt1;
+dec_msg_type(?SCCP_MSGT_DT2) -> sccp_msgt_dt2;
+dec_msg_type(?SCCP_MSGT_AK) -> sccp_msgt_ak;
+dec_msg_type(?SCCP_MSGT_UDT) -> sccp_msgt_udt;
+dec_msg_type(?SCCP_MSGT_UDTS) -> sccp_msgt_udts;
+dec_msg_type(?SCCP_MSGT_ED) -> sccp_msgt_ed;
+dec_msg_type(?SCCP_MSGT_EA) -> sccp_msgt_ea;
+dec_msg_type(?SCCP_MSGT_RSR) -> sccp_msgt_rsr;
+dec_msg_type(?SCCP_MSGT_RSC) -> sccp_msgt_rsc;
+dec_msg_type(?SCCP_MSGT_ERR) -> sccp_msgt_err;
+dec_msg_type(?SCCP_MSGT_IT) -> sccp_msgt_it;
+dec_msg_type(?SCCP_MSGT_XUDT) -> sccp_msgt_xudt;
+dec_msg_type(?SCCP_MSGT_XUDTS) -> sccp_msgt_xudts;
+dec_msg_type(?SCCP_MSGT_LUDT) -> sccp_msgt_ludt;
+dec_msg_type(?SCCP_MSGT_LUDTS) -> sccp_msgt_ludts.
+
+enc_msg_type(sccp_msgt_cr) -> ?SCCP_MSGT_CR;
+enc_msg_type(sccp_msgt_cc) -> ?SCCP_MSGT_CC;
+enc_msg_type(sccp_msgt_cref) -> ?SCCP_MSGT_CREF;
+enc_msg_type(sccp_msgt_rlsd) -> ?SCCP_MSGT_RLSD;
+enc_msg_type(sccp_msgt_rlc) -> ?SCCP_MSGT_RLC;
+enc_msg_type(sccp_msgt_dt1) -> ?SCCP_MSGT_DT1;
+enc_msg_type(sccp_msgt_dt2) -> ?SCCP_MSGT_DT2;
+enc_msg_type(sccp_msgt_ak) -> ?SCCP_MSGT_AK;
+enc_msg_type(sccp_msgt_udt) -> ?SCCP_MSGT_UDT;
+enc_msg_type(sccp_msgt_udts) -> ?SCCP_MSGT_UDTS;
+enc_msg_type(sccp_msgt_ed) -> ?SCCP_MSGT_ED;
+enc_msg_type(sccp_msgt_ea) -> ?SCCP_MSGT_EA;
+enc_msg_type(sccp_msgt_rsr) -> ?SCCP_MSGT_RSR;
+enc_msg_type(sccp_msgt_rsc) -> ?SCCP_MSGT_RSC;
+enc_msg_type(sccp_msgt_err) -> ?SCCP_MSGT_ERR;
+enc_msg_type(sccp_msgt_it) -> ?SCCP_MSGT_IT;
+enc_msg_type(sccp_msgt_xudt) -> ?SCCP_MSGT_XUDT;
+enc_msg_type(sccp_msgt_xudts) -> ?SCCP_MSGT_XUDTS;
+enc_msg_type(sccp_msgt_ludt) -> ?SCCP_MSGT_LUDT;
+enc_msg_type(sccp_msgt_ludts) -> ?SCCP_MSGT_LUDTS.
