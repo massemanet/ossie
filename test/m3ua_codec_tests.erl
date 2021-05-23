@@ -8,6 +8,7 @@
 -include("../include/m3ua.hrl").
 -include("../include/mtp3.hrl").
 
+%% parser test for real-world ISUP data
 m3ua_ssnm_duna_test() ->
     Bin = <<16#01,16#00,16#02,16#01,16#00,16#00,16#00,16#10,16#00,16#12,16#00,16#08,16#00,16#00,16#05,16#04>>,
     ?debugMsg(?FUNCTION_NAME),
