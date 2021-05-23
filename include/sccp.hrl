@@ -21,6 +21,135 @@
 -define(SCCP_MSGT_LUDT,		19).	% Long unitdata
 -define(SCCP_MSGT_LUDTS,	20).	% Long unitdata service
 
+%% Q.713 (03/01) - Chapter 4
+-record(sccp_msg_params_cr,
+        {src_local_ref,
+         protocol_class,
+         called_party_addr,
+         credit = undefined,
+         calling_party_addr = undefined,
+         data = undefined,
+         hop_counter = undefined,
+         importance = undefined
+        }).
+-record(sccp_msg_params_cc,
+        {dst_local_ref,
+         src_local_ref,
+         protocol_class,
+         credit = undefined,
+         called_party_addr = undefined,
+         data = undefined,
+         importance = undefined
+        }).
+-record(sccp_msg_params_cref,
+        {dst_local_ref,
+         refusal_cause,
+         called_party_addr = undefined,
+         data = undefined,
+         importance = undefined
+        }).
+-record(sccp_msg_params_rlsd,
+        {dst_local_ref,
+         src_local_ref,
+         release_cause,
+         data = undefined,
+         importance = undefined
+        }).
+-record(sccp_msg_params_rlc,
+        {dst_local_ref,
+         src_local_ref
+        }).
+-record(sccp_msg_params_dt1,
+        {dst_local_ref,
+         segm_reass,
+         data
+        }).
+-record(sccp_msg_params_dt2,
+        {dst_local_ref,
+         seq_segm,
+         data
+        }).
+-record(sccp_msg_params_ak,
+        {dst_local_ref,
+         rx_seq_nr,
+         credit
+        }).
+-record(sccp_msg_params_udt,
+        {protocol_class,
+         called_party_addr,
+         calling_party_addr,
+         data
+        }).
+-record(sccp_msg_params_udts,
+        {return_cause,
+         called_party_addr,
+         calling_party_addr,
+         data
+        }).
+-record(sccp_msg_params_ed,
+        {dst_local_ref,
+         data
+        }).
+-record(sccp_msg_params_ea,
+        {dst_local_ref
+        }).
+-record(sccp_msg_params_rsr,
+        {dst_local_ref,
+         src_local_ref,
+         reset_cause
+        }).
+-record(sccp_msg_params_rsc,
+        {dst_local_ref,
+         src_local_ref
+        }).
+-record(sccp_msg_params_err,
+        {dst_local_ref,
+         error_cause
+        }).
+-record(sccp_msg_params_it,
+        {dst_local_ref,
+         src_local_ref,
+         protocol_class,
+         seq_segm,
+         credit
+        }).
+-record(sccp_msg_params_xudt,
+        {protocol_class,
+         hop_counter,
+         called_party_addr,
+         calling_party_addr,
+         data,
+         segmentation = undefined,
+         importance = undefined
+        }).
+-record(sccp_msg_params_xudts,
+        {return_cause,
+         hop_counter,
+         called_party_addr,
+         calling_party_addr,
+         data,
+         segmentation = undefined,
+         importance = undefined
+        }).
+-record(sccp_msg_params_ludt,
+        {protocol_class,
+         hop_counter,
+         called_party_addr,
+         calling_party_addr,
+         long_data,
+         segmentation = undefined,
+         importance = undefined
+        }).
+-record(sccp_msg_params_ludts,
+        {return_cause,
+         hop_counter,
+         called_party_addr,
+         calling_party_addr,
+         long_data,
+         segmentation = undefined,
+         importance = undefined
+        }).
+
 % Table 2 / Q.713 - SCCP parameter name codes
 -define(SCCP_PNC_END_OF_OPTIONAL,		0).
 -define(SCCP_PNC_DESTINATION_LOCAL_REFERENCE,	1).
@@ -138,15 +267,18 @@
 -define(SCCP_CAUSE_REF_USER_ORIGINATED,		2#00000011).
 -define(SCCP_CAUSE_REF_DEST_UNKNOWN,		2#00000100).
 -define(SCCP_CAUSE_REF_DEST_INACCESS,		2#00000101).
--define(SCCP_CAUSE_REF_QOS_UNAVAIL_TRANS,	2#00000110).
--define(SCCP_CAUSE_REF_QOS_UNAVAIL_NTRANS,	2#00000111).
+-define(SCCP_CAUSE_REF_QOS_UNAVAIL_NTRANS,	2#00000110).
+-define(SCCP_CAUSE_REF_QOS_UNAVAIL_TRANS,	2#00000111).
 -define(SCCP_CAUSE_REF_ACCESS_FAIL,		2#00001000).
--define(SCCP_CAUSE_REF_ACCES_CONGESTION,	2#00001001).
+-define(SCCP_CAUSE_REF_ACCESS_CONGESTION,	2#00001001).
 -define(SCCP_CAUSE_REF_SUBSYS_FAILURE,		2#00001010).
 -define(SCCP_CAUSE_REF_SUBSYS_CONGESTION,	2#00001011).
 -define(SCCP_CAUSE_REF_EXP_CONN_EST_TMR,	2#00001100).
 -define(SCCP_CAUSE_REF_INCOMP_USER_DATA,	2#00001101).
+-define(SCCP_CAUSE_REF_RESERVED,		2#00001110).
+-define(SCCP_CAUSE_REF_UNQUALIFIED,		2#00001111).
 -define(SCCP_CAUSE_REF_HOP_COUNTER_VIOL,	2#00010000).
+-define(SCCP_CAUSE_REF_SCCP_FAIL,		2#00010001).
 -define(SCCP_CAUSE_REF_NO_GTT_FOR_NATURE,	2#00010010).
 -define(SCCP_CAUSE_REF_UNEQUIPPED_USER,		2#00010011).
 

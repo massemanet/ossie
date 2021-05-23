@@ -35,8 +35,7 @@
 -author('Harald Welte <laforge@gnumonks.org>').
 -include("../include/sccp.hrl").
 
--export([parse_sccp_msg/1, encode_sccp_msg/1, encode_sccp_msgt/2,
-         is_connectionless/1]).
+-export([parse_sccp_msg/1, encode_sccp_msg/1, encode_sccp_msgt/2]).
 
 -export([gen_gt_helper/1, gen_addr_helper/2, gen_addr_helper/3]).
 
@@ -145,7 +144,7 @@ parse_sccp_opts(OptBin, OptList) ->
 
 
 %% Parse incoming SCCP message, one function for every message type
-parse_sccp_msgt(?SCCP_MSGT_CR, DataBin) ->
+parse_sccp_msgt(sccp_msgt_cr, DataBin) ->
     %% first get the fixed part
     <<_:8, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, RemainVar/binary >> = DataBin,
     %% variable length fixed part
@@ -156,52 +155,85 @@ parse_sccp_msgt(?SCCP_MSGT_CR, DataBin) ->
     %% optional part
     OptBin = binary:part(RemainVar, 1 + PtrOpt, byte_size(RemainVar)-(1+PtrOpt)),
     OptList = parse_sccp_opts(OptBin, []),
-                                                %OptList = [],
     %% build parsed list of message
-    [{src_local_ref, SrcLocalRef},{protocol_class, {ProtoClass, PCOpt}},
-     {called_party_addr, CalledPartyDec} | OptList];
-parse_sccp_msgt(?SCCP_MSGT_CC, DataBin) ->
+    #sccp_msg_params_cr{src_local_ref = SrcLocalRef,
+                        protocol_class = dec_protocol_class_and_options({ProtoClass, PCOpt}),
+                        called_party_addr = CalledPartyDec,
+                        credit = proplists:get_value(credit, OptList),
+                        calling_party_addr = proplists:get_value(calling_party_addr, OptList),
+                        data = proplists:get_value(data, OptList),
+                        hop_counter = proplists:get_value(hop_counter, OptList),
+                        importance = proplists:get_value(importance, OptList)
+                       };
+parse_sccp_msgt(sccp_msgt_cc, DataBin) ->
     %% first get the fixed part
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, PtrOpt:8, Remain/binary >> = DataBin,
     %% optional part
     OptBin = binary:part(Remain, PtrOpt-1, byte_size(Remain)-(PtrOpt-1)),
     OptList = parse_sccp_opts(OptBin, []),
     %% build parsed list of message
-    [{dst_local_ref, DstLocalRef},{src_local_ref, SrcLocalRef},
-     {protocol_class, {ProtoClass, PCOpt}} | OptList];
-parse_sccp_msgt(?SCCP_MSGT_CREF, DataBin) ->
+    #sccp_msg_params_cc{dst_local_ref = DstLocalRef,
+                        src_local_ref = SrcLocalRef,
+                        protocol_class = dec_protocol_class_and_options({ProtoClass, PCOpt}),
+                        credit = proplists:get_value(credit, OptList),
+                        called_party_addr = proplists:get_value(called_party_addr, OptList),
+                        data = proplists:get_value(data, OptList),
+                        importance = proplists:get_value(importance,  OptList)
+                       };
+parse_sccp_msgt(sccp_msgt_cref, DataBin) ->
     %% first get the fixed part
     <<_:8, DstLocalRef:24/big, RefusalCause:8, Remain/binary >> = DataBin,
     %% optional part
     OptList = parse_sccp_opts(Remain, []),
     %% build parsed list of message
-    [{dst_local_ref, DstLocalRef},{refusal_cause, RefusalCause}|OptList];
-parse_sccp_msgt(?SCCP_MSGT_RLSD, DataBin) ->
+    #sccp_msg_params_cref{dst_local_ref = DstLocalRef,
+                          refusal_cause = dec_refusal_cause(RefusalCause),
+                          called_party_addr = proplists:get_value(called_party_addr, OptList),
+                          data = proplists:get_value(data, OptList),
+                          importance = proplists:get_value(importance, OptList)
+                         };
+parse_sccp_msgt(sccp_msgt_rlsd, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big, ReleaseCause:8, Remain/binary >> = DataBin,
     %% optional part
     OptList = parse_sccp_opts(Remain, []),
     %% build parsed list of message
-    [{dst_local_ref, DstLocalRef},{src_local_ref, SrcLocalRef},{release_cause, ReleaseCause}|OptList];
-parse_sccp_msgt(?SCCP_MSGT_RLC, DataBin) ->
+    #sccp_msg_params_rlsd{dst_local_ref = DstLocalRef,
+                          src_local_ref = SrcLocalRef,
+                          release_cause = ReleaseCause,
+                          data = proplists:get_value(data, OptList),
+                          importance = proplists:get_value(importance, OptList)
+                         };
+parse_sccp_msgt(sccp_msgt_rlc, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big>> = DataBin,
     %% build parsed list of message
-    [{dst_local_ref, DstLocalRef},{src_local_ref, SrcLocalRef}];
-parse_sccp_msgt(?SCCP_MSGT_DT1, DataBin) ->
+    #sccp_msg_params_rlc{dst_local_ref = DstLocalRef,
+                         src_local_ref = SrcLocalRef
+                        };
+parse_sccp_msgt(sccp_msgt_dt1, DataBin) ->
     <<_:8, DstLocalRef:24/big, SegmReass:8, DataPtr:8, Remain/binary >> = DataBin,
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
     %% build parsed list of message
-    [{dst_local_ref, DstLocalRef},{segm_reass, SegmReass},{data, UserData}];
-parse_sccp_msgt(?SCCP_MSGT_DT2, DataBin) ->
+    #sccp_msg_params_dt1{dst_local_ref = DstLocalRef,
+                         segm_reass = SegmReass,
+                         data = UserData
+                        };
+parse_sccp_msgt(sccp_msgt_dt2, DataBin) ->
     <<_:8, DstLocalRef:24/big, SeqSegm:16, DataPtr:8, Remain/binary >> = DataBin,
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
     %% build parsed list of message
-    [{dst_local_ref, DstLocalRef},{seq_segm, SeqSegm},{data, UserData}];
-parse_sccp_msgt(?SCCP_MSGT_AK, DataBin) ->
+    #sccp_msg_params_dt2{dst_local_ref = DstLocalRef,
+                         seq_segm = SeqSegm,
+                         data = UserData
+                        };
+parse_sccp_msgt(sccp_msgt_ak, DataBin) ->
     <<_:8, DstLocalRef:24/big, RxSeqnr:8, Credit:8>> = DataBin,
-    [{dst_local_ref, DstLocalRef},{rx_seq_nr, RxSeqnr},{credit, Credit}];
-parse_sccp_msgt(?SCCP_MSGT_UDT, DataBin) ->
+    #sccp_msg_params_ak{dst_local_ref = DstLocalRef,
+                        rx_seq_nr = RxSeqnr,
+                        credit = Credit
+                       };
+parse_sccp_msgt(sccp_msgt_udt, DataBin) ->
     <<_:8, PCOpt:4, ProtoClass:4, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, Remain/binary >> = DataBin,
     %% variable part
     CalledPartyLen = binary:at(Remain, CalledPartyPtr-3),
@@ -212,9 +244,12 @@ parse_sccp_msgt(?SCCP_MSGT_UDT, DataBin) ->
     CallingPartyDec = parse_sccp_addr(CallingParty),
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
-    [{protocol_class, {ProtoClass, PCOpt}},{called_party_addr, CalledPartyDec},
-     {calling_party_addr, CallingPartyDec},{data, UserData}];
-parse_sccp_msgt(?SCCP_MSGT_UDTS, DataBin) ->
+    #sccp_msg_params_udt{protocol_class = dec_protocol_class_and_options({ProtoClass, PCOpt}),
+                         called_party_addr = CalledPartyDec,
+                         calling_party_addr = CallingPartyDec,
+                         data = UserData
+                        };
+parse_sccp_msgt(sccp_msgt_udts, DataBin) ->
     <<_:8, ReturnCause:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, Remain/binary >> = DataBin,
     %% variable part
     CalledPartyLen = binary:at(Remain, CalledPartyPtr-3),
@@ -225,30 +260,47 @@ parse_sccp_msgt(?SCCP_MSGT_UDTS, DataBin) ->
     CallingPartyDec = parse_sccp_addr(CallingParty),
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
-    [{return_cause, ReturnCause},{called_party_addr, CalledPartyDec},
-     {calling_party_addr, CallingPartyDec},{data, UserData}];
-parse_sccp_msgt(?SCCP_MSGT_ED, DataBin) ->
+    #sccp_msg_params_udts{return_cause = dec_return_cause(ReturnCause),
+                          called_party_addr = CalledPartyDec,
+                          calling_party_addr = CallingPartyDec,
+                          data = UserData
+                         };
+parse_sccp_msgt(sccp_msgt_ed, DataBin) ->
     <<_:8, DstLocalRef:24/big, DataPtr:8, Remain/binary>> = DataBin,
     DataLen = binary:at(Remain, DataPtr-1),
     UserData = binary:part(Remain, DataPtr-1+1, DataLen),
-    [{dst_local_ref, DstLocalRef}, {data, UserData}];
-parse_sccp_msgt(?SCCP_MSGT_EA, DataBin) ->
+    #sccp_msg_params_ed{dst_local_ref = DstLocalRef,
+                        data = UserData
+                       };
+parse_sccp_msgt(sccp_msgt_ea, DataBin) ->
     <<_:8, DstLocalRef:24/big>> = DataBin,
-    [{dst_local_ref, DstLocalRef}];
-parse_sccp_msgt(?SCCP_MSGT_RSR, DataBin) ->
+    #sccp_msg_params_ea{dst_local_ref = DstLocalRef
+                       };
+parse_sccp_msgt(sccp_msgt_rsr, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big, ResetCause:8>> = DataBin,
-    [{dst_local_ref, DstLocalRef},{src_local_ref, SrcLocalRef},{reset_cause, ResetCause}];
-parse_sccp_msgt(?SCCP_MSGT_RSC, DataBin) ->
+    #sccp_msg_params_rsr{dst_local_ref = DstLocalRef,
+                         src_local_ref = SrcLocalRef,
+                         reset_cause = dec_reset_cause(ResetCause)
+                        };
+parse_sccp_msgt(sccp_msgt_rsc, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big>> = DataBin,
-    [{dst_local_ref, DstLocalRef},{src_local_ref, SrcLocalRef}];
-parse_sccp_msgt(?SCCP_MSGT_ERR, DataBin) ->
+    #sccp_msg_params_rsc{dst_local_ref = DstLocalRef,
+                         src_local_ref = SrcLocalRef
+                        };
+parse_sccp_msgt(sccp_msgt_err, DataBin) ->
     <<_:8, DstLocalRef:24/big, ErrCause:8>> = DataBin,
-    [{dst_local_ref, DstLocalRef},{error_cause, ErrCause}];
-parse_sccp_msgt(?SCCP_MSGT_IT, DataBin) ->
+    #sccp_msg_params_err{dst_local_ref = DstLocalRef,
+                         error_cause = dec_error_cause(ErrCause)
+                        };
+parse_sccp_msgt(sccp_msgt_it, DataBin) ->
     <<_:8, DstLocalRef:24/big, SrcLocalRef:24/big, PCOpt: 4, ProtoClass:4, SegmSeq:16, Credit:8>> = DataBin,
-    [{dst_local_ref, DstLocalRef},{src_local_ref, SrcLocalRef},
-     {protocol_class, {ProtoClass, PCOpt}},{seq_segm, SegmSeq},{credit, Credit}];
-parse_sccp_msgt(?SCCP_MSGT_XUDT, DataBin) ->
+    #sccp_msg_params_it{dst_local_ref = DstLocalRef,
+                        src_local_ref = SrcLocalRef,
+                        protocol_class = dec_protocol_class_and_options({ProtoClass, PCOpt}),
+                        seq_segm = SegmSeq,
+                        credit = Credit
+                       };
+parse_sccp_msgt(sccp_msgt_xudt, DataBin) ->
     <<_:8, PCOpt: 4, ProtoClass:4, HopCounter:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, OptPtr:8, Remain/binary>> = DataBin,
     CalledPartyLen = binary:at(Remain, CalledPartyPtr-4),
     CalledParty = binary:part(Remain, CalledPartyPtr-4+1, CalledPartyLen),
@@ -264,10 +316,15 @@ parse_sccp_msgt(?SCCP_MSGT_XUDT, DataBin) ->
                  _ -> binary:part(Remain, OptPtr-1, byte_size(Remain)-(OptPtr-1))
              end,
     OptList = parse_sccp_opts(OptBin, []),
-    [{protocol_class, {ProtoClass, PCOpt}}, {hop_counter, HopCounter},
-     {called_party_addr, CalledPartyDec}, {calling_party_addr, CallingPartyDec},
-     {data, Data} | OptList];
-parse_sccp_msgt(?SCCP_MSGT_XUDTS, DataBin) ->
+    #sccp_msg_params_xudt{protocol_class = dec_protocol_class_and_options({ProtoClass, PCOpt}),
+                          hop_counter = HopCounter,
+                          called_party_addr = CalledPartyDec,
+                          calling_party_addr = CallingPartyDec,
+                          data = Data,
+                          segmentation = proplists:get_value(segmentation, OptList),
+                          importance = proplists:get_value(importance, OptList)
+                         };
+parse_sccp_msgt(sccp_msgt_xudts, DataBin) ->
     <<_:8, ReturnCause:8, HopCounter:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, OptPtr:8, Remain/binary>> = DataBin,
     CalledPartyLen = binary:at(Remain, CalledPartyPtr-4),
     CalledParty = binary:part(Remain, CalledPartyPtr-4+1, CalledPartyLen),
@@ -283,15 +340,66 @@ parse_sccp_msgt(?SCCP_MSGT_XUDTS, DataBin) ->
                  _ -> binary:part(Remain, OptPtr-1, byte_size(Remain)-(OptPtr-1))
              end,
     OptList = parse_sccp_opts(OptBin, []),
-    [{return_cause, ReturnCause}, {hop_counter, HopCounter},
-     {called_party_addr, CalledPartyDec}, {calling_party_addr, CallingPartyDec},
-     {data, Data} | OptList].
+    #sccp_msg_params_xudts{return_cause = dec_return_cause(ReturnCause),
+                           hop_counter = HopCounter,
+                           called_party_addr = CalledPartyDec,
+                           calling_party_addr = CallingPartyDec,
+                           data = Data,
+                           segmentation = proplists:get_value(segmentation, OptList),
+                           importance = proplists:get_value(importance, OptList)
+                          };
+parse_sccp_msgt(sccp_msgt_ludt, DataBin) ->
+    <<_:8, PCOpt: 4, ProtoClass:4, HopCounter:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, OptPtr:8, Remain/binary>> = DataBin,
+    CalledPartyLen = binary:at(Remain, CalledPartyPtr-4),
+    CalledParty = binary:part(Remain, CalledPartyPtr-4+1, CalledPartyLen),
+    CalledPartyDec = parse_sccp_addr(CalledParty),
+    CallingPartyLen = binary:at(Remain, CallingPartyPtr-3),
+    CallingParty = binary:part(Remain, CallingPartyPtr-3+1, CallingPartyLen),
+    CallingPartyDec = parse_sccp_addr(CallingParty),
+    DataLen = binary:at(Remain, DataPtr-2),
+    Data = binary:part(Remain, DataPtr-2+1, DataLen),
 
-%% FIXME: LUDT/LUDTS
+    OptBin = case OptPtr of
+                 0 -> <<>>;
+                 _ -> binary:part(Remain, OptPtr-1, byte_size(Remain)-(OptPtr-1))
+             end,
+    OptList = parse_sccp_opts(OptBin, []),
+    #sccp_msg_params_ludt{protocol_class = dec_protocol_class_and_options({ProtoClass, PCOpt}),
+                          hop_counter = HopCounter,
+                          called_party_addr = CalledPartyDec,
+                          calling_party_addr = CallingPartyDec,
+                          long_data = Data,
+                          segmentation = proplists:get_value(segmentation, OptList),
+                          importance = proplists:get_value(importance, OptList)
+                         };
+parse_sccp_msgt(sccp_msgt_ludts, DataBin) ->
+    <<_:8, ReturnCause:8, HopCounter:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, OptPtr:8, Remain/binary>> = DataBin,
+    CalledPartyLen = binary:at(Remain, CalledPartyPtr-4),
+    CalledParty = binary:part(Remain, CalledPartyPtr-4+1, CalledPartyLen),
+    CalledPartyDec = parse_sccp_addr(CalledParty),
+    CallingPartyLen = binary:at(Remain, CallingPartyPtr-3),
+    CallingParty = binary:part(Remain, CallingPartyPtr-3+1, CallingPartyLen),
+    CallingPartyDec = parse_sccp_addr(CallingParty),
+    DataLen = binary:at(Remain, DataPtr-2),
+    Data = binary:part(Remain, DataPtr-2+1, DataLen),
+
+    OptBin = case OptPtr of
+                 0 -> <<>>;
+                 _ -> binary:part(Remain, OptPtr-1, byte_size(Remain)-(OptPtr-1))
+             end,
+    OptList = parse_sccp_opts(OptBin, []),
+    #sccp_msg_params_ludts{return_cause = dec_return_cause(ReturnCause),
+                           hop_counter = HopCounter,
+                           called_party_addr = CalledPartyDec,
+                           calling_party_addr = CallingPartyDec,
+                           long_data = Data,
+                           segmentation = proplists:get_value(segmentation, OptList),
+                           importance = proplists:get_value(importance, OptList)
+                          }.
 
 %% process one incoming SCCP message
 parse_sccp_msg(DataBin) ->
-    MsgType = binary:first(DataBin),
+    MsgType = dec_msg_type(binary:first(DataBin)),
     Parsed = parse_sccp_msgt(MsgType, DataBin),
     {ok, #sccp_msg{msg_type = MsgType, parameters = Parsed}}.
 
@@ -387,8 +495,8 @@ encode_sccp_opt({Opt, DataInt}) when is_integer(DataInt), DataInt =< 255 ->
 encode_sccp_opt({Opt, DataList}) when is_list(DataList) ->
     encode_sccp_opt({Opt, list_to_binary(DataList)}).
 
-encode_sccp_opts(OptList, Filter) ->
-    FilteredList = lists:filter(fun({Tag, _Val}) -> proplists:is_defined(opt_to_atom(Tag), Filter) end, OptList),
+encode_sccp_opts(OptList) ->
+    FilteredList = lists:filter(fun({_Tag, Val}) -> undefined =/= Val end, OptList),
     e_sccp_opts(FilteredList, <<>>).
 
 e_sccp_opts([], <<>>) ->
@@ -401,62 +509,105 @@ e_sccp_opts([CurOpt|OptPropList], OptEnc) ->
     e_sccp_opts(OptPropList, list_to_binary([OptEnc,CurOptEnc])).
 
 
-encode_sccp_msgt(?SCCP_MSGT_CR, Params) ->
-    SrcLocalRef = proplists:get_value(src_local_ref, Params),
-    {ProtoClass, PCOpt} = proplists:get_value(protocol_class, Params),
-    CalledParty = proplists:get_value(called_party_addr, Params),
+encode_sccp_msgt(?SCCP_MSGT_CR, P) ->
+    #sccp_msg_params_cr{src_local_ref = SrcLocalRef,
+                        protocol_class = ProtocolClassOpts,
+                        called_party_addr = CalledParty,
+                        credit = Credit,
+                        calling_party_addr = CallingParty,
+                        data = Data,
+                        hop_counter = HopCounter,
+                        importance = Importance
+                       } = P,
     CalledPartyEnc = encode_sccp_addr(CalledParty),
     CalledPartyLen = byte_size(CalledPartyEnc),
     PtrOpt = CalledPartyLen+1+1,
-    OptBin = encode_sccp_opts(Params, [credit, calling_party_addr, data, hop_counter, importance]),
+    Params = [{credit, Credit},
+              {calling_party_addr, CallingParty},
+              {data, Data},
+              {hop_counter, HopCounter},
+              {importance, Importance}],
+    OptBin = encode_sccp_opts(Params),
+    {ProtoClass, PCOpt} = enc_protocol_class_and_options(ProtocolClassOpts),
     <<?SCCP_MSGT_CR:8, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, 2:8, PtrOpt:8, CalledPartyLen:8, CalledPartyEnc/binary, OptBin/binary>>;
-encode_sccp_msgt(?SCCP_MSGT_CC, Params) ->
-    SrcLocalRef = proplists:get_value(src_local_ref, Params),
-    DstLocalRef = proplists:get_value(dst_local_ref, Params),
-    {ProtoClass, PCOpt} = proplists:get_value(protocol_class, Params),
-    OptBin = encode_sccp_opts(Params, [credit, called_party_addr, data, importance]),
+encode_sccp_msgt(?SCCP_MSGT_CC, P) ->
+    #sccp_msg_params_cc{dst_local_ref = DstLocalRef,
+                        src_local_ref = SrcLocalRef,
+                        protocol_class = ProtocolClassOpts,
+                        credit = Credit,
+                        called_party_addr = CalledParty,
+                        data = Data,
+                        importance = Importance
+                       } = P,
+    Params = [{credit, Credit},
+              {called_party_addr, CalledParty},
+              {data, Data},
+              {importance, Importance}],
+    OptBin = encode_sccp_opts(Params),
+    {ProtoClass, PCOpt} = enc_protocol_class_and_options(ProtocolClassOpts),
     <<?SCCP_MSGT_CC:8, DstLocalRef:24/big, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, OptBin/binary>>;
-encode_sccp_msgt(?SCCP_MSGT_CREF, Params) ->
-    DstLocalRef = proplists:get_value(dst_local_ref, Params),
-    RefusalCause = proplists:get_value(refusal_cause, Params),
-    OptBin = encode_sccp_opts(Params, [called_party_addr, data, importance]),
+encode_sccp_msgt(?SCCP_MSGT_CREF, P) ->
+    #sccp_msg_params_cref{dst_local_ref = DstLocalRef,
+                          refusal_cause = RefCause,
+                          called_party_addr = CalledParty,
+                          data = Data,
+                          importance = Importance
+                         } = P,
+    Params = [{called_party_addr, CalledParty},
+              {data, Data},
+              {importance, Importance}],
+    OptBin = encode_sccp_opts(Params),
+    RefusalCause = enc_refusal_cause(RefCause),
     <<?SCCP_MSGT_CREF:8, DstLocalRef:24/big, RefusalCause:8, OptBin/binary>>;
-encode_sccp_msgt(?SCCP_MSGT_RLSD, Params) ->
-    SrcLocalRef = proplists:get_value(src_local_ref, Params),
-    DstLocalRef = proplists:get_value(dst_local_ref, Params),
-    ReleaseCause = proplists:get_value(release_cause, Params),
-    OptBin = encode_sccp_opts(Params, [data, importance]),
+encode_sccp_msgt(?SCCP_MSGT_RLSD, P) ->
+    #sccp_msg_params_rlsd{dst_local_ref = DstLocalRef,
+                          src_local_ref = SrcLocalRef,
+                          release_cause = ReleaseCause,
+                          data = Data,
+                          importance = Importance
+                         } = P,
+    Params = [{data, Data},
+              {importance, Importance}],
+    OptBin = encode_sccp_opts(Params),
     <<?SCCP_MSGT_RLSD:8, DstLocalRef:24/big, SrcLocalRef:24/big, ReleaseCause:8, OptBin/binary>>;
-encode_sccp_msgt(?SCCP_MSGT_RLC, Params) ->
-    SrcLocalRef = proplists:get_value(src_local_ref, Params),
-    DstLocalRef = proplists:get_value(dst_local_ref, Params),
+encode_sccp_msgt(?SCCP_MSGT_RLC, P) ->
+    #sccp_msg_params_rlc{dst_local_ref = DstLocalRef,
+                         src_local_ref = SrcLocalRef
+                        } = P,
     <<?SCCP_MSGT_RLC:8, DstLocalRef:24/big, SrcLocalRef:24/big>>;
-encode_sccp_msgt(?SCCP_MSGT_DT1, Params) ->
-    DstLocalRef = proplists:get_value(dst_local_ref, Params),
-    SegmReass = proplists:get_value(segm_reass, Params),
-    UserData = binarify(proplists:get_value(data, Params)),
+encode_sccp_msgt(?SCCP_MSGT_DT1, P) ->
+    #sccp_msg_params_dt1{dst_local_ref = DstLocalRef,
+                         segm_reass = SegmReass,
+                         data = Data
+                        } = P,
+    UserData = binarify(Data),
     UserDataLen = byte_size(UserData),
     <<?SCCP_MSGT_DT1:8, DstLocalRef:24/big, SegmReass:8, 1:8, UserDataLen:8, UserData/binary>>;
-encode_sccp_msgt(?SCCP_MSGT_DT2, Params) ->
-    DstLocalRef = proplists:get_value(dst_local_ref, Params),
-    SeqSegm = proplists:get_value(seq_segm, Params),
-    UserData = binarify(proplists:get_value(data, Params)),
+encode_sccp_msgt(?SCCP_MSGT_DT2, P) ->
+    #sccp_msg_params_dt2{dst_local_ref = DstLocalRef,
+                         seq_segm = SeqSegm,
+                         data = Data
+                        } = P,
+    UserData = binarify(Data),
     UserDataLen = byte_size(UserData),
     <<?SCCP_MSGT_DT2:8, DstLocalRef:24/big, SeqSegm:16, 1:8, UserDataLen:8, UserData/binary>>;
-encode_sccp_msgt(?SCCP_MSGT_AK, Params) ->
-    DstLocalRef = proplists:get_value(dst_local_ref, Params),
-    RxSeqnr = proplists:get_value(rx_seqnr, Params),
-    Credit = proplists:get_value(credit, Params),
+encode_sccp_msgt(?SCCP_MSGT_AK, P) ->
+    #sccp_msg_params_ak{dst_local_ref = DstLocalRef,
+                        rx_seq_nr = RxSeqnr,
+                        credit = Credit
+                       } = P,
     <<?SCCP_MSGT_AK:8, DstLocalRef:24/big, RxSeqnr:8, Credit:8>>;
-encode_sccp_msgt(?SCCP_MSGT_UDT, Params) ->
-    {ProtoClass, PCOpt} = proplists:get_value(protocol_class, Params),
-    CalledParty = proplists:get_value(called_party_addr, Params),
+encode_sccp_msgt(?SCCP_MSGT_UDT, P) ->
+    #sccp_msg_params_udt{protocol_class = ProtocolClassOpts,
+                         called_party_addr = CalledParty,
+                         calling_party_addr = CallingParty,
+                         data = Data
+                        } = P,
     CalledPartyEnc = encode_sccp_addr(CalledParty),
     CalledPartyLen = byte_size(CalledPartyEnc),
-    CallingParty = proplists:get_value(calling_party_addr, Params),
     CallingPartyEnc = encode_sccp_addr(CallingParty),
     CallingPartyLen = byte_size(CallingPartyEnc),
-    UserData = binarify(proplists:get_value(data, Params)),
+    UserData = binarify(Data),
     UserDataLen = byte_size(UserData),
     %% variable part
     CalledPartyPtr = 3,
@@ -465,16 +616,19 @@ encode_sccp_msgt(?SCCP_MSGT_UDT, Params) ->
     Remain = <<CalledPartyLen:8, CalledPartyEnc/binary,
                CallingPartyLen:8, CallingPartyEnc/binary,
                UserDataLen:8, UserData/binary>>,
+    {ProtoClass, PCOpt} = enc_protocol_class_and_options(ProtocolClassOpts),
     <<?SCCP_MSGT_UDT:8, PCOpt:4, ProtoClass:4, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, Remain/binary>>;
-encode_sccp_msgt(?SCCP_MSGT_UDTS, Params) ->
-    ReturnCause = proplists:get_value(return_cause, Params),
-    CalledParty = proplists:get_value(called_party_addr, Params),
+encode_sccp_msgt(?SCCP_MSGT_UDTS, P) ->
+    #sccp_msg_params_udts{return_cause = ReturnCause,
+                          called_party_addr = CalledParty,
+                          calling_party_addr = CallingParty,
+                          data = Data
+                         } = P,
     CalledPartyEnc = encode_sccp_addr(CalledParty),
     CalledPartyLen = byte_size(CalledPartyEnc),
-    CallingParty = proplists:get_value(calling_party_addr, Params),
     CallingPartyEnc = encode_sccp_addr(CallingParty),
     CallingPartyLen = byte_size(CallingPartyEnc),
-    UserData = binarify(proplists:get_value(data, Params)),
+    UserData = binarify(Data),
     UserDataLen = byte_size(UserData),
     %% variable part
     CalledPartyPtr = 3,
@@ -483,48 +637,64 @@ encode_sccp_msgt(?SCCP_MSGT_UDTS, Params) ->
     Remain = <<CalledPartyLen:8, CalledPartyEnc/binary,
                CallingPartyLen:8, CallingPartyEnc/binary,
                UserDataLen:8, UserData/binary>>,
-    <<?SCCP_MSGT_UDTS:8, ReturnCause:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, Remain/binary>>;
-encode_sccp_msgt(?SCCP_MSGT_ED, Params) ->
-    DstLocalRef = proplists:get_value(dst_local_ref, Params),
-    UserData = binarify(proplists:get_value(data, Params)),
+    RetCause = enc_return_cause(ReturnCause),
+    <<?SCCP_MSGT_UDTS:8, RetCause:8, CalledPartyPtr:8, CallingPartyPtr:8, DataPtr:8, Remain/binary>>;
+encode_sccp_msgt(?SCCP_MSGT_ED, P) ->
+    #sccp_msg_params_ed{dst_local_ref = DstLocalRef,
+                        data = Data
+                       } = P,
+    UserData = binarify(Data),
     UserDataLen = byte_size(UserData),
     DataPtr = 1,
     <<?SCCP_MSGT_ED:8, DstLocalRef:24/big, DataPtr:8, UserDataLen:8, UserData/binary>>;
-encode_sccp_msgt(?SCCP_MSGT_EA, Params) ->
-    DstLocalRef = proplists:get_value(dst_local_ref, Params),
+encode_sccp_msgt(?SCCP_MSGT_EA, P) ->
+    #sccp_msg_params_ea{dst_local_ref = DstLocalRef
+                       } = P,
     <<?SCCP_MSGT_EA:8, DstLocalRef:24/big>>;
-encode_sccp_msgt(?SCCP_MSGT_RSR, Params) ->
-    DstLocalRef = proplists:get_value(dst_local_ref, Params),
-    SrcLocalRef = proplists:get_value(src_local_ref, Params),
-    ResetCause = proplists:get_value(reset_cause, Params),
+encode_sccp_msgt(?SCCP_MSGT_RSR, P) ->
+    #sccp_msg_params_rsr{dst_local_ref = DstLocalRef,
+                         src_local_ref = SrcLocalRef,
+                         reset_cause = ResCause
+                        } = P,
+    ResetCause = enc_reset_cause(ResCause),
     <<?SCCP_MSGT_RSR:8, DstLocalRef:24/big, SrcLocalRef:24/big, ResetCause:8>>;
-encode_sccp_msgt(?SCCP_MSGT_RSC, Params) ->
-    DstLocalRef = proplists:get_value(dst_local_ref, Params),
-    SrcLocalRef = proplists:get_value(src_local_ref, Params),
+encode_sccp_msgt(?SCCP_MSGT_RSC, P) ->
+    #sccp_msg_params_rsc{dst_local_ref = DstLocalRef,
+                         src_local_ref = SrcLocalRef
+                        } = P,
     <<?SCCP_MSGT_RSC:8, DstLocalRef:24/big, SrcLocalRef:24/big>>;
-encode_sccp_msgt(?SCCP_MSGT_ERR, Params) ->
-    DstLocalRef = proplists:get_value(dst_local_ref, Params),
-    ErrCause = proplists:get_value(error_cause, Params),
-    <<?SCCP_MSGT_ERR:8, DstLocalRef:24/big, ErrCause:8>>;
-encode_sccp_msgt(?SCCP_MSGT_IT, Params) ->
-    DstLocalRef = proplists:get_value(dst_local_ref, Params),
-    SrcLocalRef = proplists:get_value(src_local_ref, Params),
-    {ProtoClass, PCOpt} = proplists:get_value(protocol_class, Params),
-    SegmSeq = proplists:get_value(seq_segm, Params),
-    Credit = proplists:get_value(credit, Params),
-    <<?SCCP_MSGT_IT:8, DstLocalRef:24/big, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, SegmSeq:16, Credit:8>>;
-encode_sccp_msgt(?SCCP_MSGT_XUDT, Params) ->
-    {ProtoClass, PCOpt} = proplists:get_value(protocol_class, Params),
-    HopCounter = proplists:get_value(hop_counter, Params),
-    CalledParty = proplists:get_value(called_party_addr, Params),
+encode_sccp_msgt(?SCCP_MSGT_ERR, P) ->
+    #sccp_msg_params_err{dst_local_ref = DstLocalRef,
+                         error_cause = ErrCause
+                        } = P,
+    ErrorCause = enc_error_cause(ErrCause),
+    <<?SCCP_MSGT_ERR:8, DstLocalRef:24/big, ErrorCause:8>>;
+encode_sccp_msgt(?SCCP_MSGT_IT, P) ->
+    #sccp_msg_params_it{dst_local_ref = DstLocalRef,
+                        src_local_ref = SrcLocalRef,
+                        protocol_class = ProtocolClassOpts,
+                        seq_segm = SeqSegm,
+                        credit = Credit
+                       } = P,
+    {ProtoClass, PCOpt} = enc_protocol_class_and_options(ProtocolClassOpts),
+    <<?SCCP_MSGT_IT:8, DstLocalRef:24/big, SrcLocalRef:24/big, PCOpt:4, ProtoClass:4, SeqSegm:16, Credit:8>>;
+encode_sccp_msgt(?SCCP_MSGT_XUDT, P) ->
+    #sccp_msg_params_xudt{protocol_class = ProtocolClassOpts,
+                          hop_counter = HopCounter,
+                          called_party_addr = CalledParty,
+                          calling_party_addr = CallingParty,
+                          data = Data,
+                          segmentation = Segmentation,
+                          importance = Importance
+                         } = P,
     CalledPartyEnc = encode_sccp_addr(CalledParty),
     CalledPartyLen = byte_size(CalledPartyEnc),
-    CallingParty = proplists:get_value(calling_party_addr, Params),
     CallingPartyEnc = encode_sccp_addr(CallingParty),
     CallingPartyLen = byte_size(CallingPartyEnc),
-    Data = proplists:get_value(data, Params),
     DataLen = byte_size(Data),
-    OptBin = encode_sccp_opts(Params, [segmentation, importance]),
+    Params = [{segmentation, Segmentation},
+              {importance, Importance}],
+    OptBin = encode_sccp_opts(Params),
     %% (after four pointers)
     PtrCalledParty = 4,
     %% (after three pointers plus called party with length)
@@ -536,24 +706,30 @@ encode_sccp_msgt(?SCCP_MSGT_XUDT, Params) ->
                  %% after one pointer and called/calling parties and data, all with lengths
                  _ -> 1 + (1 + CalledPartyLen) + (1 + CallingPartyLen) + (1 + DataLen)
              end,
+    {ProtoClass, PCOpt} = enc_protocol_class_and_options(ProtocolClassOpts),
     <<?SCCP_MSGT_XUDT:8, PCOpt:4, ProtoClass:4, HopCounter:8,
       PtrCalledParty:8, PtrCallingParty:8, PtrData:8, PtrOpt:8,
       CalledPartyLen:8, CalledPartyEnc/binary,
       CallingPartyLen:8, CallingPartyEnc/binary,
       DataLen:8, Data/binary,
       OptBin/binary>>;
-encode_sccp_msgt(?SCCP_MSGT_XUDTS, Params) ->
-    ReturnCause = proplists:get_value(return_cause, Params),
-    HopCounter = proplists:get_value(hop_counter, Params),
-    CalledParty = proplists:get_value(called_party_addr, Params),
+encode_sccp_msgt(?SCCP_MSGT_XUDTS, P) ->
+    #sccp_msg_params_xudts{return_cause = ReturnCause,
+                           hop_counter = HopCounter,
+                           called_party_addr = CalledParty,
+                           calling_party_addr = CallingParty,
+                           data = Data,
+                           segmentation = Segmentation,
+                           importance = Importance
+                          } = P,
     CalledPartyEnc = encode_sccp_addr(CalledParty),
     CalledPartyLen = byte_size(CalledPartyEnc),
-    CallingParty = proplists:get_value(calling_party_addr, Params),
     CallingPartyEnc = encode_sccp_addr(CallingParty),
     CallingPartyLen = byte_size(CallingPartyEnc),
-    Data = proplists:get_value(data, Params),
     DataLen = byte_size(Data),
-    OptBin = encode_sccp_opts(Params, [segmentation, importance]),
+    Params = [{segmenetation, Segmentation},
+              {importance, Importance}],
+    OptBin = encode_sccp_opts(Params),
     %% (after four pointers)
     PtrCalledParty = 4,
     %% (after three pointers plus called party with length)
@@ -565,33 +741,88 @@ encode_sccp_msgt(?SCCP_MSGT_XUDTS, Params) ->
                  %% after one pointer and called/calling parties and data, all with lengths
                  _ -> 1 + (1 + CalledPartyLen) + (1 + CallingPartyLen) + (1 + DataLen)
              end,
-    <<?SCCP_MSGT_XUDTS:8, ReturnCause:8, HopCounter:8,
+    RetCause = enc_return_cause(ReturnCause),
+    <<?SCCP_MSGT_XUDTS:8, RetCause:8, HopCounter:8,
+      PtrCalledParty:8, PtrCallingParty:8, PtrData:8, PtrOpt:8,
+      CalledPartyLen:8, CalledPartyEnc/binary,
+      CallingPartyLen:8, CallingPartyEnc/binary,
+      DataLen:8, Data/binary,
+      OptBin/binary>>;
+encode_sccp_msgt(?SCCP_MSGT_LUDT, P) ->
+    #sccp_msg_params_ludt{protocol_class = ProtocolClassOpts,
+                          hop_counter = HopCounter,
+                          called_party_addr = CalledParty,
+                          calling_party_addr = CallingParty,
+                          long_data = Data,
+                          segmentation = Segmentation,
+                          importance = Importance
+                         } = P,
+    CalledPartyEnc = encode_sccp_addr(CalledParty),
+    CalledPartyLen = byte_size(CalledPartyEnc),
+    CallingPartyEnc = encode_sccp_addr(CallingParty),
+    CallingPartyLen = byte_size(CallingPartyEnc),
+    DataLen = byte_size(Data),
+    Params = [{segmentation, Segmentation},
+              {importance, Importance}],
+    OptBin = encode_sccp_opts(Params),
+    %% (after four pointers)
+    PtrCalledParty = 4,
+    %% (after three pointers plus called party with length)
+    PtrCallingParty = 3 + (1 + CalledPartyLen),
+    %% (after two pointers plus called and calling parties with lengths)
+    PtrData = 2 + (1 + CalledPartyLen) + (1 + CallingPartyLen),
+    PtrOpt = case OptBin of
+                 <<>> -> 0;
+                 %% after one pointer and called/calling parties and data, all with lengths
+                 _ -> 1 + (1 + CalledPartyLen) + (1 + CallingPartyLen) + (1 + DataLen)
+             end,
+    {ProtoClass, PCOpt} = enc_protocol_class_and_options(ProtocolClassOpts),
+    <<?SCCP_MSGT_LUDT:8, PCOpt:4, ProtoClass:4, HopCounter:8,
+      PtrCalledParty:8, PtrCallingParty:8, PtrData:8, PtrOpt:8,
+      CalledPartyLen:8, CalledPartyEnc/binary,
+      CallingPartyLen:8, CallingPartyEnc/binary,
+      DataLen:8, Data/binary,
+      OptBin/binary>>;
+encode_sccp_msgt(?SCCP_MSGT_LUDTS, P) ->
+    #sccp_msg_params_ludts{return_cause = ReturnCause,
+                           hop_counter = HopCounter,
+                           called_party_addr = CalledParty,
+                           calling_party_addr = CallingParty,
+                           long_data = Data,
+                           segmentation = Segmentation,
+                           importance = Importance
+                          } = P,
+    CalledPartyEnc = encode_sccp_addr(CalledParty),
+    CalledPartyLen = byte_size(CalledPartyEnc),
+    CallingPartyEnc = encode_sccp_addr(CallingParty),
+    CallingPartyLen = byte_size(CallingPartyEnc),
+    DataLen = byte_size(Data),
+    Params = [{segmenetation, Segmentation},
+              {importance, Importance}],
+    OptBin = encode_sccp_opts(Params),
+    %% (after four pointers)
+    PtrCalledParty = 4,
+    %% (after three pointers plus called party with length)
+    PtrCallingParty = 3 + (1 + CalledPartyLen),
+    %% (after two pointers plus called and calling parties with lengths)
+    PtrData = 2 + (1 + CalledPartyLen) + (1 + CallingPartyLen),
+    PtrOpt = case OptBin of
+                 <<>> -> 0;
+                 %% after one pointer and called/calling parties and data, all with lengths
+                 _ -> 1 + (1 + CalledPartyLen) + (1 + CallingPartyLen) + (1 + DataLen)
+             end,
+    RetCause = enc_return_cause(ReturnCause),
+    <<?SCCP_MSGT_LUDTS:8, RetCause:8, HopCounter:8,
       PtrCalledParty:8, PtrCallingParty:8, PtrData:8, PtrOpt:8,
       CalledPartyLen:8, CalledPartyEnc/binary,
       CallingPartyLen:8, CallingPartyEnc/binary,
       DataLen:8, Data/binary,
       OptBin/binary>>.
 
-%% FIXME: LUDT/LUDTS
-
 %% encode one sccp message data structure into the on-wire format
 encode_sccp_msg(#sccp_msg{msg_type = MsgType, parameters = Params}) ->
-    encode_sccp_msgt(MsgType, Params).
-
-%% is the supplied message type a connectionless message?
-is_connectionless(#sccp_msg{msg_type = MsgType}) ->
-    is_connectionless(MsgType);
-is_connectionless(MsgType) ->
-    case MsgType of
-        ?SCCP_MSGT_UDT -> true;
-        ?SCCP_MSGT_UDTS -> true;
-        ?SCCP_MSGT_XUDT -> true;
-        ?SCCP_MSGT_XUDTS -> true;
-        ?SCCP_MSGT_LUDT -> true;
-        ?SCCP_MSGT_LUDTS -> true;
-        _ -> false
-    end.
-
+    MsgT = enc_msg_type(MsgType),
+    encode_sccp_msgt(MsgT, Params).
 
 gen_gt_helper(Number) when is_list(Number) ->
     #global_title{gti=?SCCP_GTI_NAT_ONLY,
@@ -660,3 +891,177 @@ atom_to_opt(Atom) ->
         long_data       -> ?SCCP_PNC_LONG_DATA;
         Foo             -> Foo
     end.
+
+dec_msg_type(?SCCP_MSGT_CR) -> sccp_msgt_cr;
+dec_msg_type(?SCCP_MSGT_CC) -> sccp_msgt_cc;
+dec_msg_type(?SCCP_MSGT_CREF) -> sccp_msgt_cref;
+dec_msg_type(?SCCP_MSGT_RLSD) -> sccp_msgt_rlsd;
+dec_msg_type(?SCCP_MSGT_RLC) -> sccp_msgt_rlc;
+dec_msg_type(?SCCP_MSGT_DT1) -> sccp_msgt_dt1;
+dec_msg_type(?SCCP_MSGT_DT2) -> sccp_msgt_dt2;
+dec_msg_type(?SCCP_MSGT_AK) -> sccp_msgt_ak;
+dec_msg_type(?SCCP_MSGT_UDT) -> sccp_msgt_udt;
+dec_msg_type(?SCCP_MSGT_UDTS) -> sccp_msgt_udts;
+dec_msg_type(?SCCP_MSGT_ED) -> sccp_msgt_ed;
+dec_msg_type(?SCCP_MSGT_EA) -> sccp_msgt_ea;
+dec_msg_type(?SCCP_MSGT_RSR) -> sccp_msgt_rsr;
+dec_msg_type(?SCCP_MSGT_RSC) -> sccp_msgt_rsc;
+dec_msg_type(?SCCP_MSGT_ERR) -> sccp_msgt_err;
+dec_msg_type(?SCCP_MSGT_IT) -> sccp_msgt_it;
+dec_msg_type(?SCCP_MSGT_XUDT) -> sccp_msgt_xudt;
+dec_msg_type(?SCCP_MSGT_XUDTS) -> sccp_msgt_xudts;
+dec_msg_type(?SCCP_MSGT_LUDT) -> sccp_msgt_ludt;
+dec_msg_type(?SCCP_MSGT_LUDTS) -> sccp_msgt_ludts.
+
+enc_msg_type(sccp_msgt_cr) -> ?SCCP_MSGT_CR;
+enc_msg_type(sccp_msgt_cc) -> ?SCCP_MSGT_CC;
+enc_msg_type(sccp_msgt_cref) -> ?SCCP_MSGT_CREF;
+enc_msg_type(sccp_msgt_rlsd) -> ?SCCP_MSGT_RLSD;
+enc_msg_type(sccp_msgt_rlc) -> ?SCCP_MSGT_RLC;
+enc_msg_type(sccp_msgt_dt1) -> ?SCCP_MSGT_DT1;
+enc_msg_type(sccp_msgt_dt2) -> ?SCCP_MSGT_DT2;
+enc_msg_type(sccp_msgt_ak) -> ?SCCP_MSGT_AK;
+enc_msg_type(sccp_msgt_udt) -> ?SCCP_MSGT_UDT;
+enc_msg_type(sccp_msgt_udts) -> ?SCCP_MSGT_UDTS;
+enc_msg_type(sccp_msgt_ed) -> ?SCCP_MSGT_ED;
+enc_msg_type(sccp_msgt_ea) -> ?SCCP_MSGT_EA;
+enc_msg_type(sccp_msgt_rsr) -> ?SCCP_MSGT_RSR;
+enc_msg_type(sccp_msgt_rsc) -> ?SCCP_MSGT_RSC;
+enc_msg_type(sccp_msgt_err) -> ?SCCP_MSGT_ERR;
+enc_msg_type(sccp_msgt_it) -> ?SCCP_MSGT_IT;
+enc_msg_type(sccp_msgt_xudt) -> ?SCCP_MSGT_XUDT;
+enc_msg_type(sccp_msgt_xudts) -> ?SCCP_MSGT_XUDTS;
+enc_msg_type(sccp_msgt_ludt) -> ?SCCP_MSGT_LUDT;
+enc_msg_type(sccp_msgt_ludts) -> ?SCCP_MSGT_LUDTS.
+
+dec_protocol_class_and_options({0, 0}) -> {basic_connectionless, discard_on_error};
+dec_protocol_class_and_options({0, 8}) -> {basic_connectionless, return_on_error};
+dec_protocol_class_and_options({0, S}) -> {basic_connectionless, {spare, S}};
+dec_protocol_class_and_options({1, 0}) -> {sequenced_connectionless, discard_on_error};
+dec_protocol_class_and_options({1, 8}) -> {sequenced_connectionless, return_on_error};
+dec_protocol_class_and_options({1, S}) -> {sequenced_connectionless, {spare, S}};
+dec_protocol_class_and_options({2, S}) -> {basic_connection_oriented, {spare, S}};
+dec_protocol_class_and_options({3, S}) -> {flow_control_connection_oriented, {spare, S}}.
+
+enc_protocol_class_and_options({basic_connectionless, discard_on_error}) -> {0, 0};
+enc_protocol_class_and_options({basic_connectionless, return_on_error}) -> {0, 8};
+enc_protocol_class_and_options({basic_connectionless, {spare, S}}) -> {0, S};
+enc_protocol_class_and_options({sequenced_connectionless, discard_on_error}) -> {1, 0};
+enc_protocol_class_and_options({sequenced_connectionless, return_on_error}) -> {1, 8};
+enc_protocol_class_and_options({sequenced_connectionless, {spare, S}}) -> {1, S};
+enc_protocol_class_and_options({basic_connection_oriented, {spare, S}}) -> {2, S};
+enc_protocol_class_and_options({flow_control_connection_oriented, {spare, S}}) -> {3, S}.
+
+dec_return_cause(?SCCP_CAUSE_RET_NOTRANS_NATURE) -> no_translation_of_addr_nature;
+dec_return_cause(?SCCP_CAUSE_RET_NOTRANS_ADDR) ->  no_translation_of_addr;
+dec_return_cause(?SCCP_CAUSE_RET_SUBSYS_CONG) -> subsystem_congestion;
+dec_return_cause(?SCCP_CAUSE_RET_SUBSYS_FAILURE) -> subsystem_failure;
+dec_return_cause(?SCCP_CAUSE_RET_UNEQUIP_USER) -> unequipped_user;
+dec_return_cause(?SCCP_CAUSE_RET_MTP_FAILURE) -> network_failure;
+dec_return_cause(?SCCP_CAUSE_RET_NET_CONG) -> network_congestion;
+dec_return_cause(?SCCP_CAUSE_RET_UNQUALIFIED) -> unqualified;
+dec_return_cause(?SCCP_CAUSE_RET_ERR_MSG_TRANSP) -> error_message_transport;
+dec_return_cause(?SCCP_CAUSE_RET_ERR_LOCAL_PROC) -> error_local_processing;
+dec_return_cause(?SCCP_CAUSE_RET_DEST_NO_REASS) -> destination_cannot_reassemble;
+dec_return_cause(?SCCP_CAUSE_RET_SCCP_FAILURE) -> sccp_failure;
+dec_return_cause(?SCCP_CAUSE_RET_HOP_CTR_FAIL) -> hop_counter_violation;
+dec_return_cause(?SCCP_CAUSE_RET_SEG_NOT_SUPP) -> segmentation_unsupported;
+dec_return_cause(?SCCP_CAUSE_RET_SEG_FAILURE) -> segmentation_failure;
+dec_return_cause(Ret) -> {reserved, Ret}.
+
+enc_return_cause(no_translation_of_addr_nature) -> ?SCCP_CAUSE_RET_NOTRANS_NATURE;
+enc_return_cause(no_translation_of_addr) -> ?SCCP_CAUSE_RET_NOTRANS_ADDR;
+enc_return_cause(subsystem_congestion) -> ?SCCP_CAUSE_RET_SUBSYS_CONG;
+enc_return_cause(subsystem_failure) -> ?SCCP_CAUSE_RET_SUBSYS_FAILURE;
+enc_return_cause(unequipped_user) -> ?SCCP_CAUSE_RET_UNEQUIP_USER;
+enc_return_cause(network_failure) -> ?SCCP_CAUSE_RET_MTP_FAILURE;
+enc_return_cause(network_congestion) -> ?SCCP_CAUSE_RET_NET_CONG;
+enc_return_cause(unqualified) -> ?SCCP_CAUSE_RET_UNQUALIFIED;
+enc_return_cause(error_message_transport) -> ?SCCP_CAUSE_RET_ERR_MSG_TRANSP;
+enc_return_cause(error_local_processing) -> ?SCCP_CAUSE_RET_ERR_LOCAL_PROC;
+enc_return_cause(destination_cannot_reassemble) -> ?SCCP_CAUSE_RET_DEST_NO_REASS;
+enc_return_cause(sccp_failure) -> ?SCCP_CAUSE_RET_SCCP_FAILURE;
+enc_return_cause(hop_counter_violation) -> ?SCCP_CAUSE_RET_HOP_CTR_FAIL;
+enc_return_cause(segmentation_unsupported) -> ?SCCP_CAUSE_RET_SEG_NOT_SUPP;
+enc_return_cause(segmentation_failure) -> ?SCCP_CAUSE_RET_SEG_FAILURE;
+enc_return_cause({reserved, Ret}) -> Ret.
+
+dec_reset_cause(?SCCP_CAUSE_RES_ENDU_ORIGINATED) -> end_user_originated;
+dec_reset_cause(?SCCP_CAUSE_RES_SCCP_USER_ORIG) -> sccp_user_originated;
+dec_reset_cause(?SCCP_CAUSE_RES_MSGO_OOO_PS) -> msg_out_of_order_incorrect_ps;
+dec_reset_cause(?SCCP_CAUSE_RES_MSGO_OOO_PR) -> msg_out_of_order_incorrect_pr;
+dec_reset_cause(?SCCP_CAUSE_RES_MSGO_OO_WIND) -> remote_procedure_error_message_out_of_window;
+dec_reset_cause(?SCCP_CAUSE_RES_INC_PS_REINIT) -> remote_procedure_error_incorrect_ps_after_reinitialization;
+dec_reset_cause(?SCCP_CAUSE_RES_REM_GENERAL) -> remote_procedure_error_general;
+dec_reset_cause(?SCCP_CAUSE_RES_REM_OPERATIONAL) -> remote_end_user_operational;
+dec_reset_cause(?SCCP_CAUSE_RES_NET_OPERATIONAL) -> network_operational;
+dec_reset_cause(?SCCP_CAUSE_RES_ACC_OPERATIONAL) -> access_operational;
+dec_reset_cause(?SCCP_CAUSE_RES_NET_CONG) -> network_congestion;
+dec_reset_cause(?SCCP_CAUSE_RES_UNQUALIFIED) -> unqualified.
+
+enc_reset_cause(end_user_originated) -> ?SCCP_CAUSE_RES_ENDU_ORIGINATED;
+enc_reset_cause(sccp_user_originated) -> ?SCCP_CAUSE_RES_SCCP_USER_ORIG;
+enc_reset_cause(msg_out_of_order_incorrect_ps) -> ?SCCP_CAUSE_RES_MSGO_OOO_PS;
+enc_reset_cause(msg_out_of_order_incorrect_pr) -> ?SCCP_CAUSE_RES_MSGO_OOO_PR;
+enc_reset_cause(remote_procedure_error_message_out_of_window) -> ?SCCP_CAUSE_RES_MSGO_OO_WIND;
+enc_reset_cause(remote_procedure_error_incorrect_ps_after_reinitialization) -> ?SCCP_CAUSE_RES_INC_PS_REINIT;
+enc_reset_cause(remote_procedure_error_general) -> ?SCCP_CAUSE_RES_REM_GENERAL;
+enc_reset_cause(remote_end_user_operational) -> ?SCCP_CAUSE_RES_REM_OPERATIONAL;
+enc_reset_cause(network_operational) -> ?SCCP_CAUSE_RES_NET_OPERATIONAL;
+enc_reset_cause(access_operational) -> ?SCCP_CAUSE_RES_ACC_OPERATIONAL;
+enc_reset_cause(network_congestion) -> ?SCCP_CAUSE_RES_NET_CONG;
+enc_reset_cause(unqualified) -> ?SCCP_CAUSE_RES_UNQUALIFIED.
+
+dec_error_cause(?SCCP_CAUSE_ERR_LRN_UNASSIGNED) -> local_reference_number_mismatch_unassigned_destination;
+dec_error_cause(?SCCP_CAUSE_ERR_LRN_MISMATCH) -> local_reference_number_mismatch_inconsistent_source;
+dec_error_cause(?SCCP_CAUSE_ERR_PC_MISMATCH) -> point_code_mismatch;
+dec_error_cause(?SCCP_CAUSE_ERR_SCLASS_MISMATCH) -> service_class_mismatch;
+dec_error_cause(?SCCP_CAUSE_ERR_UNQUALIFIED) -> unqualified.
+
+enc_error_cause(local_reference_number_mismatch_unassigned_destination) -> ?SCCP_CAUSE_ERR_LRN_UNASSIGNED;
+enc_error_cause(local_reference_number_mismatch_inconsistent_source) -> ?SCCP_CAUSE_ERR_LRN_MISMATCH;
+enc_error_cause(point_code_mismatch) -> ?SCCP_CAUSE_ERR_PC_MISMATCH;
+enc_error_cause(service_class_mismatch) -> ?SCCP_CAUSE_ERR_SCLASS_MISMATCH;
+enc_error_cause(unqualified) -> ?SCCP_CAUSE_ERR_UNQUALIFIED.
+
+dec_refusal_cause(?SCCP_CAUSE_REF_ENDU_ORIGINATED) -> end_user_originated;
+dec_refusal_cause(?SCCP_CAUSE_REF_ENDU_CONGESTION) -> end_user_congestion;
+dec_refusal_cause(?SCCP_CAUSE_REF_ENDU_FAILURE) -> end_user_failure;
+dec_refusal_cause(?SCCP_CAUSE_REF_USER_ORIGINATED) -> sccp_user_originated;
+dec_refusal_cause(?SCCP_CAUSE_REF_DEST_UNKNOWN) -> destination_address_unknown;
+dec_refusal_cause(?SCCP_CAUSE_REF_DEST_INACCESS) -> destination_inaccess;
+dec_refusal_cause(?SCCP_CAUSE_REF_QOS_UNAVAIL_NTRANS) -> network_resource_qos_unavailable_non_transient;
+dec_refusal_cause(?SCCP_CAUSE_REF_QOS_UNAVAIL_TRANS) -> network_resource_qos_unavailable_transient;
+dec_refusal_cause(?SCCP_CAUSE_REF_ACCESS_FAIL) -> access_failure;
+dec_refusal_cause(?SCCP_CAUSE_REF_ACCESS_CONGESTION) -> access_congestion;
+dec_refusal_cause(?SCCP_CAUSE_REF_SUBSYS_FAILURE) -> subsystem_failure;
+dec_refusal_cause(?SCCP_CAUSE_REF_SUBSYS_CONGESTION) -> subsystem_congestion;
+dec_refusal_cause(?SCCP_CAUSE_REF_EXP_CONN_EST_TMR) -> expiration_of_the_connection_established_timer;
+dec_refusal_cause(?SCCP_CAUSE_REF_INCOMP_USER_DATA) -> incompatible_user_data;
+dec_refusal_cause(?SCCP_CAUSE_REF_RESERVED) -> reserved;
+dec_refusal_cause(?SCCP_CAUSE_REF_UNQUALIFIED) -> unqualified;
+dec_refusal_cause(?SCCP_CAUSE_REF_HOP_COUNTER_VIOL) -> hop_counter_violation;
+dec_refusal_cause(?SCCP_CAUSE_REF_SCCP_FAIL) -> sccp_failure;
+dec_refusal_cause(?SCCP_CAUSE_REF_NO_GTT_FOR_NATURE) -> no_translation_for_an_address_of_such_nature;
+dec_refusal_cause(?SCCP_CAUSE_REF_UNEQUIPPED_USER) -> unequipped_user.
+
+enc_refusal_cause(end_user_originated) -> ?SCCP_CAUSE_REF_ENDU_ORIGINATED;
+enc_refusal_cause(end_user_congestion) -> ?SCCP_CAUSE_REF_ENDU_CONGESTION;
+enc_refusal_cause(end_user_failure) -> ?SCCP_CAUSE_REF_ENDU_FAILURE;
+enc_refusal_cause(sccp_user_originated) -> ?SCCP_CAUSE_REF_USER_ORIGINATED;
+enc_refusal_cause(destination_address_unknown) -> ?SCCP_CAUSE_REF_DEST_UNKNOWN;
+enc_refusal_cause(destination_inaccess) -> ?SCCP_CAUSE_REF_DEST_INACCESS;
+enc_refusal_cause(network_resource_qos_unavailable_non_transient) -> ?SCCP_CAUSE_REF_QOS_UNAVAIL_NTRANS;
+enc_refusal_cause(network_resource_qos_unavailable_transient) -> ?SCCP_CAUSE_REF_QOS_UNAVAIL_TRANS;
+enc_refusal_cause(access_failure) -> ?SCCP_CAUSE_REF_ACCESS_FAIL;
+enc_refusal_cause(access_congestion) -> ?SCCP_CAUSE_REF_ACCESS_CONGESTION;
+enc_refusal_cause(subsystem_failure) -> ?SCCP_CAUSE_REF_SUBSYS_FAILURE;
+enc_refusal_cause(subsystem_congestion) -> ?SCCP_CAUSE_REF_SUBSYS_CONGESTION;
+enc_refusal_cause(expiration_of_the_connection_established_timer) -> ?SCCP_CAUSE_REF_EXP_CONN_EST_TMR;
+enc_refusal_cause(incompatible_user_data) -> ?SCCP_CAUSE_REF_INCOMP_USER_DATA;
+enc_refusal_cause(reserved) -> ?SCCP_CAUSE_REF_RESERVED;
+enc_refusal_cause(unqualified) -> ?SCCP_CAUSE_REF_UNQUALIFIED;
+enc_refusal_cause(hop_counter_violation) -> ?SCCP_CAUSE_REF_HOP_COUNTER_VIOL;
+enc_refusal_cause(sccp_failure) -> ?SCCP_CAUSE_REF_SCCP_FAIL;
+enc_refusal_cause(no_translation_for_an_address_of_such_nature) -> ?SCCP_CAUSE_REF_NO_GTT_FOR_NATURE;
+enc_refusal_cause(unequipped_user) -> ?SCCP_CAUSE_REF_UNEQUIPPED_USER.
