@@ -727,7 +727,7 @@ encode_sccp_msgt(?SCCP_MSGT_XUDTS, P) ->
     CallingPartyEnc = encode_sccp_addr(CallingParty),
     CallingPartyLen = byte_size(CallingPartyEnc),
     DataLen = byte_size(Data),
-    Params = [{segmenetation, Segmentation},
+    Params = [{segmentation, Segmentation},
               {importance, Importance}],
     OptBin = encode_sccp_opts(Params),
     %% (after four pointers)
@@ -797,7 +797,7 @@ encode_sccp_msgt(?SCCP_MSGT_LUDTS, P) ->
     CallingPartyEnc = encode_sccp_addr(CallingParty),
     CallingPartyLen = byte_size(CallingPartyEnc),
     DataLen = byte_size(Data),
-    Params = [{segmenetation, Segmentation},
+    Params = [{segmentation, Segmentation},
               {importance, Importance}],
     OptBin = encode_sccp_opts(Params),
     %% (after four pointers)
@@ -869,27 +869,28 @@ opt_to_atom(Num) ->
     end.
 
 atom_to_opt(Atom) ->
+    %% Even though the tags are defined for these parameters, they are not optional.
+    %% See optional parts for the different messages Q.713 - Chapter 1 and 4
     case Atom of
-        dst_local_ref   -> ?SCCP_PNC_DESTINATION_LOCAL_REFERENCE;
-        src_local_ref   -> ?SCCP_PNC_SOURCE_LOCAL_REFERENCE;
+        %% dst_local_ref   -> ?SCCP_PNC_DESTINATION_LOCAL_REFERENCE;
+        %% src_local_ref   -> ?SCCP_PNC_SOURCE_LOCAL_REFERENCE;
         called_party_addr  -> ?SCCP_PNC_CALLED_PARTY_ADDRESS;
         calling_party_addr -> ?SCCP_PNC_CALLING_PARTY_ADDRESS;
-        protocol_class  -> ?SCCP_PNC_PROTOCOL_CLASS;
-        segmenting      -> ?SCCP_PNC_SEGMENTING;
-        rx_seq_number   -> ?SCCP_PNC_RECEIVE_SEQ_NUMBER;
-        seq_segm        -> ?SCCP_PNC_SEQUENCING;
+        %% protocol_class  -> ?SCCP_PNC_PROTOCOL_CLASS;
+        %% segmenting      -> ?SCCP_PNC_SEGMENTING;
+        %% rx_seq_number   -> ?SCCP_PNC_RECEIVE_SEQ_NUMBER;
+        %% seq_segm        -> ?SCCP_PNC_SEQUENCING;
         credit          -> ?SCCP_PNC_CREDIT;
-        release_cause   -> ?SCCP_PNC_RELEASE_CAUSE;
-        return_cause    -> ?SCCP_PNC_RETURN_CAUSE;
-        reset_cause     -> ?SCCP_PNC_RESET_CAUSE;
-        error_cause     -> ?SCCP_PNC_ERROR_CAUSE;
-        refusal_cause   -> ?SCCP_PNC_REFUSAL_CAUSE;
+        %% release_cause   -> ?SCCP_PNC_RELEASE_CAUSE;
+        %% return_cause    -> ?SCCP_PNC_RETURN_CAUSE;
+        %% reset_cause     -> ?SCCP_PNC_RESET_CAUSE;
+        %% error_cause     -> ?SCCP_PNC_ERROR_CAUSE;
+        %% refusal_cause   -> ?SCCP_PNC_REFUSAL_CAUSE;
         data            -> ?SCCP_PNC_DATA;
         segmentation    -> ?SCCP_PNC_SEGMENTATION;
         hop_counter     -> ?SCCP_PNC_HOP_COUNTER;
-        importance      -> ?SCCP_PNC_IMPORTANCE;
-        long_data       -> ?SCCP_PNC_LONG_DATA;
-        Foo             -> Foo
+        importance      -> ?SCCP_PNC_IMPORTANCE
+        %% long_data       -> ?SCCP_PNC_LONG_DATA;
     end.
 
 dec_msg_type(?SCCP_MSGT_CR) -> sccp_msgt_cr;
