@@ -41,6 +41,7 @@
 -export([pointcode2int/1, pointcode2int/2, pointcode_fmt/2]).
 -export([asn_val/1]).
 -export([get_env/2, get_env/3]).
+-export([decode_tbcd/1, encode_tbcd/1]).
 
 -include_lib("include/util.hrl").
 
@@ -217,3 +218,46 @@ get_env(App, Var, Default) ->
         {ok, Value} ->
             Value
     end.
+
+%% "telephony binary coded decimal"
+%% TS 29.002, type TBCD-STRING
+%% "123" -> <<2:4, 1:4, 15:4, 3:4>>.
+decode_tbcd(asn1_NOVALUE) ->
+    undefined;
+decode_tbcd(Bin) ->
+    lists:reverse(decode_tbcd(Bin, [])).
+
+decode_tbcd(<<>>, Acc) ->
+    Acc;
+decode_tbcd(<<2#1111:4, D1:4>>, Acc) ->
+    [dec_tbcd_digit(D1) | Acc];
+decode_tbcd(<<D1:4, D2:4, Ds/binary>>, Acc) ->
+    decode_tbcd(Ds, [dec_tbcd_digit(D1), dec_tbcd_digit(D2) | Acc]).
+
+dec_tbcd_digit(D) when D >= 0, D =< 9 -> D + $0;
+dec_tbcd_digit(2#1010) -> $*;
+dec_tbcd_digit(2#1011) -> $#;
+dec_tbcd_digit(2#1100) -> $a;
+dec_tbcd_digit(2#1101) -> $b;
+dec_tbcd_digit(2#1110) -> $c.
+
+encode_tbcd(Str) ->
+    encode_tbcd(Str, <<>>).
+
+encode_tbcd([D1, D2 | Ds], Acc) ->
+    encode_tbcd(Ds, enc_tbcd_digits(D1, D2, Acc));
+encode_tbcd([D], Acc) ->
+    enc_tbcd_digits(D, pad, Acc);
+encode_tbcd([], Acc) ->
+    Acc.
+
+enc_tbcd_digits(D1, D2, Acc) ->
+    <<Acc/binary, (enc_tbcd_digit(D2)):4, (enc_tbcd_digit(D1)):4>>.
+
+enc_tbcd_digit(D) when D >= $0, D =< $9   -> D - $0;
+enc_tbcd_digit(pad)                       -> 2#1111;
+enc_tbcd_digit($*)                        -> 2#1010;
+enc_tbcd_digit($#)                        -> 2#1011;
+enc_tbcd_digit(A) when A =:= $A; A =:= $a -> 2#1100;
+enc_tbcd_digit(B) when B =:= $B; B =:= $b -> 2#1101;
+enc_tbcd_digit(C) when C =:= $C; C =:= $c -> 2#1110.
