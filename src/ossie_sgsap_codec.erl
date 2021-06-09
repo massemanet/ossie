@@ -8,7 +8,8 @@
 parse_sgsap_msg(DataBin) when is_binary(DataBin) ->
     <<MsgType:8, Remain/binary>> = DataBin,
     MsgT = parse_msg_type(MsgType),
-    #sgsap_msg{msg_type = MsgT, msg_length = byte_size(DataBin), payload = parse_opts(MsgT, Remain)};
+    OptList = parse_sgsap_opts(Remain),
+    #sgsap_msg{msg_type = MsgT, msg_length = byte_size(DataBin), payload = OptList};
 parse_sgsap_msg(Data) when is_list(Data) ->
     parse_sgsap_msg(list_to_binary(Data)).
 
@@ -67,24 +68,31 @@ opt_types(sgsap_service_abort_request) -> [imsi];
 opt_types(sgsap_mo_csfb_indication) -> [imsi, tracking_area_identity, e_utran_cell_global_identity];
 opt_types(unknown_msg_type) -> undefined.
 
-parse_opts(MsgT, Bin) ->
-    parse_opts(opt_types(MsgT), Bin, []).
+get_num_pad_bytes(BinLenBytes) ->
+    case BinLenBytes rem 2 of
+        0 ->    0;
+        Val ->  2 - Val
+    end.
 
-parse_opts(_, <<>>, Acc) -> Acc;
-parse_opts([], _, Acc) -> Acc;
-parse_opts([{K, T}|Rest], Remain, Acc) ->
-    {Opt, R} = parse_opt(T, Remain),
-    parse_opts(Rest, R, [{K, Opt}|Acc]);
-parse_opts([T|Rest], Remain, Acc) ->
-    {Opt, R} = parse_opt(T, Remain),
-    parse_opts(Rest, R, [{T, Opt}|Acc]).
+parse_sgsap_opts(OptBin) when is_binary(OptBin) ->
+    parse_sgsap_opts(OptBin, []).
+
+parse_sgsap_opts(<<>>, OptList) when is_list(OptList) ->
+    OptList;
+parse_sgsap_opts(OptBin, OptList) when is_binary(OptBin), is_list(OptList) ->
+    <<IEI:8/big, Length:8/big, Remain/binary>> = OptBin,
+    PadLen = get_num_pad_bytes(Length),
+    LengthNet = Length - 4,
+    <<CurOpt:LengthNet/binary, 0:PadLen/integer-unit:4, Remain2/binary>> = Remain,
+    NewOpt = parse_sgsap_opt(dec_iei(IEI), CurOpt),
+    parse_sgsap_opts(Remain2, OptList ++ [NewOpt]).
 
 %% Chapter 9 Information element coding
-parse_opt(cli, Bin) ->
+parse_sgsap_opt(cli, Bin) ->
     <<?CLI:8, L:8, Remain/binary>> = Bin,
     <<CurOpt:L/binary, R/binary>>,
     {CurOpt, R};
-parse_opt(eps_location_update_type, Bin) ->
+parse_sgsap_opt(eps_location_update_type, Bin) ->
     <<?EPS_LOCATION_UPDATE_TYPE:8, _L:8, CurOpt:8/binary, Remain/binary>> = Bin,
     C = case CurOpt of
             2#00000001 -> imsi_attach;
@@ -92,21 +100,21 @@ parse_opt(eps_location_update_type, Bin) ->
             _ -> normal_location_update
         end,
     {C, Remain};
-parse_opt(erroneous_message, Bin) ->
+parse_sgsap_opt(erroneous_message, Bin) ->
     <<?ERRONEOUS_MESSAGE:8, L:8, Remain/binary>> = Bin,
     <<CurOpt:L/binary, R/binary>> = Remain,
     {CurOpt, R};
-parse_opt(e_utran_cell_global_identity, Bin) ->
+parse_sgsap_opt(e_utran_cell_global_identity, Bin) ->
     <<?E_UTRAN_CELL_GLOBAL_IDENTITY:8, L:8, Remain/binary>> = Bin,
     <<CurOpt:L/binary, R/binary>> = Remain,
     {CurOpt, R};
-parse_opt(global_cn_id, Bin) ->
+parse_sgsap_opt(global_cn_id, Bin) ->
     ;
-parse_opt(imeisv, Bin) ->
+parse_sgsap_opt(imeisv, Bin) ->
     ;
-parse_opt(imsi, Bin) ->
+parse_sgsap_opt(imsi, Bin) ->
     ;
-parse_opt(imsi_detach_from_eps_service_type, Bin) ->
+parse_sgsap_opt(imsi_detach_from_eps_service_type, Bin) ->
     <<?IMSI_DETACH_FROM_EPS_SERVICE_TYPE:8, _L:8, CurOpt:8/binary, Remain/binary>> = Bin,
     C = case CurOpt of
             2#00000001 -> network_initiated_imsi_detach_from_eps_services;
@@ -115,7 +123,7 @@ parse_opt(imsi_detach_from_eps_service_type, Bin) ->
             _ -> {reserved, CurOpt}
         end,
     {C, Remain};
-parse_opt(imsi_detach_from_non_eps_service_type, Bin) ->
+parse_sgsap_opt(imsi_detach_from_non_eps_service_type, Bin) ->
     <<?IMSI_DETACH_FROM_NON_EPS_SERVICE_TYPE:8, _L:8, CurOpt:8/binary, Remain/binary>> = Bin,
     C = case CurOpt of
             2#00000001 -> explicit_ue_initiated_imsi_detach_from_non_eps_services;
@@ -124,39 +132,39 @@ parse_opt(imsi_detach_from_non_eps_service_type, Bin) ->
             _ -> {reserved, CurOpt}
         end,
     {C, Remain};
-parse_opt(lcs_client_identity, Bin) ->
+parse_sgsap_opt(lcs_client_identity, Bin) ->
     <<?LCS_CLIENT_IDENTITY:8, L:8, Remain/binary>> = Bin,
     <<CurOpt:L/binary, R/binary>> = Remain,
     {CurOpt, R};
-parse_opt(lcs_indicator, Bin) ->
+parse_sgsap_opt(lcs_indicator, Bin) ->
     <<?LCS_INDICATOR:8, _L:8, CurOpt:8/binary, Remain/binary>> = Bin,
     C = case CurOpt of
             2#00000001 -> mt_lr;
             _ -> {unspecified, CurOpt}
         end,
     {C, Remain};
-parse_opt(location_area_identifier, Bin) ->
+parse_sgsap_opt(location_area_identifier, Bin) ->
     <<?LOCATION_AREA_IDENTIFIER:8, L:8, Remain/binary>> = Bin,
     <<CurOpt:L/binary, R/binary>> = Remain,
     {CurOpt, R};
-parse_opt(mm_information, Bin) ->
+parse_sgsap_opt(mm_information, Bin) ->
     ;
-parse_opt(mme_name, Bin) ->
+parse_sgsap_opt(mme_name, Bin) ->
     <<?MME_NAME:8, L:8, Remain/binary>> = Bin,
     <<CharBin:((57-2)*8)/binary, R/binary>> = Remain,
     Chars = [C || <<_L:8, C:8, _:8>> <= CharBin],
     {Chars, R};
-parse_opt(mobile_identity, Bin) ->
+parse_sgsap_opt(mobile_identity, Bin) ->
     ;
-parse_opt(mobile_station_classmark_2, Bin) ->
+parse_sgsap_opt(mobile_station_classmark_2, Bin) ->
     ;
-parse_opt(nas_message_container, Bin) ->
+parse_sgsap_opt(nas_message_container, Bin) ->
     <<?NAS_MESSAGE_CONTAINER:8, L:8, Remain/binary>> = Bin,
     <<CurOpt:L/binary, R/binary>> = Remain,
     {CurOpt, R};
-parse_opt(reject_cause, Bin) ->
+parse_sgsap_opt(reject_cause, Bin) ->
     ;
-parse_opt(service_indicator, Bin) ->
+parse_sgsap_opt(service_indicator, Bin) ->
     <<?SERVICE_INDICATOR:8, _L:8, CurOpt:8/binary, Remain/binary>> = Bin,
     <<CurOpt:8, R/binary>>,
     C = case CurOpt of
@@ -165,7 +173,7 @@ parse_opt(service_indicator, Bin) ->
             _ -> cs_call_indicator
         end,
     {C, R};
-parse_opt(sgs_cause, Bin) ->
+parse_sgsap_opt(sgs_cause, Bin) ->
     <<?SGS_CAUSE:8, _L:8, CurOpt:8/binary, Remain/binary>> = Bin,
     C = case CurOpt of
             2#00000001 -> imsi_detached_for_eps_services;
@@ -185,21 +193,21 @@ parse_opt(sgs_cause, Bin) ->
             _ -> {unspecified, CurOpt}
         end,
     {C, Remain};
-parse_opt(ss_code, Bin) ->
+parse_sgsap_opt(ss_code, Bin) ->
     <<?SS_CODE:8, _L:8, CurOpt:8/binary, Remain/binary>> = Bin,
     {CurOpt, Remain};
-parse_opt(tmsi, Bin) ->
+parse_sgsap_opt(tmsi, Bin) ->
     ;
-parse_opt(tmsi_status, Bin) ->
+parse_sgsap_opt(tmsi_status, Bin) ->
     ;
-parse_opt(tracking_area_identity) ->
+parse_sgsap_opt(tracking_area_identity) ->
     <<?TRACKING_AREA_IDENTITY:8, L:8, Remain/binary>> = Bin,
     <<CurOpt:L/binary, R/binary>> = Remain,
     {CurOpt, R};
-parse_opt(ue_time_zone, Bin) ->
+parse_sgsap_opt(ue_time_zone, Bin) ->
     <<?UE_TIME_ZONE:8, _L:8, CurOpt:8/binary, Remain/binary>> = Bin,
     {CurOpt, Remain};
-parse_opt(ie_emm_mode) ->
+parse_sgsap_opt(ie_emm_mode) ->
     <<?UE_EMM_MODE:8, _L:8, CurOpt:8/binary, Remain/binary>> = Bin,
     C = case CurOpt of
             2#00000001 -> emm_idle;
@@ -207,43 +215,43 @@ parse_opt(ie_emm_mode) ->
             _ -> {reserved, CurOpt}
         end,
     {C, Remain};
-parse_opt(vlr_name, Bin) ->
+parse_sgsap_opt(vlr_name, Bin) ->
     <<?VLR_NAME:8, L:8, Remain/binary>> = Bin,
     <<CharBin:L/binary, R/binary>> = Remain,
     Chars = [C || <<_L:8, C:8, _:8>> <= CharBin],
     {Chars, R};
-parse_opt(channel_needed, Bin) ->
+parse_sgsap_opt(channel_needed, Bin) ->
     ;
-parse_opt(emlpp_priority, Bin) ->
+parse_sgsap_opt(emlpp_priority, Bin) ->
     ;
-parse_opt(additional_paging_indicators, Bin) ->
+parse_sgsap_opt(additional_paging_indicators, Bin) ->
     <<?ADDITIONAL_PAGING_INDICATORS:8, _L:8, 0:7, CurOpt:1/binary, Remain/binary>> = Bin,
     C = case CurOpt of
             2#1 -> cs_restore_indicator_not_set;
             2#0 -> cs_restore_indicator_set
         end,
     {C, Remain};
-parse_opt(tmsi_based_nri_container, Bin) ->
+parse_sgsap_opt(tmsi_based_nri_container, Bin) ->
     ;
-parse_opt(selected_cs_domain_operator, Bin) ->
+parse_sgsap_opt(selected_cs_domain_operator, Bin) ->
     <<?SELECTED_CS_DOMAIN_OPERATOR:8, _L:8, CurOpt:24/binary, Remain/binary>> = Bin,
     {CurOpt, Remain};
-parse_opt(maximum_ue_availability_time, Bin) ->
+parse_sgsap_opt(maximum_ue_availability_time, Bin) ->
     <<?MAXIMUM_UE_AVAILABILITY_TIME:8, _L:8, CurOpt:32/binary, Remain/binary>> = Bin,
     {CurOpt, Remain};
-parse_opt(sm_delivery_start_time, Bin) ->
+parse_sgsap_opt(sm_delivery_start_time, Bin) ->
     <<?SM_DELIVERY_START_TIME:8, _L:8, CurOpt:32/binary, Remain/binary>> = Bin,
     {CurOpt, Remain};
-parse_opt(additional_ue_unreachable_indicators, Bin) ->
+parse_sgsap_opt(additional_ue_unreachable_indicators, Bin) ->
     <<?ADDITIONAL_UE_UNREACHABLE_INDICATORS:8, _L:8, 0:7, CurOpt:1/binary, Remain/binary>> = Bin,
     C = case CurOpt of
             2#1 -> sm_buffer_request_indicator_not_set;
             2#0 -> sm_buffer_request_indicator_set
         end,
     {C, Remain};
-parse_opt(maximum_retransmission_time, Bin) ->
+parse_sgsap_opt(maximum_retransmission_time, Bin) ->
     <<?MAXIMUM_RETRANSMISSION_TIME:8, _L:8, CurOpt:32/binary, Remain/binary>> = Bin,
     {CurOpt, Remain};
-parse_opt(requested_retransmission_time, Bin) ->
+parse_sgsap_opt(requested_retransmission_time, Bin) ->
     <<?REQUESTED_RETRANSMISSION_TIME:8, _L:8, CurOpt:32/binary, Remain/binary>> = Bin,
     {CurOpt, Remain};

@@ -66,7 +66,7 @@ parse_m3ua_opts(OptBin, OptList) when is_binary(OptBin), is_list(OptList) ->
     NewOpt = parse_m3ua_opt(dec_iei(IEI), CurOpt),
     parse_m3ua_opts(Remain2, OptList ++ [NewOpt]).
 
-parse_m3ua_opt(Opt = m3ua_iei_protocol_data, MsgBin) when is_binary(MsgBin) ->
+parse_m3ua_opt(m3ua_iei_protocol_data = Opt, MsgBin) when is_binary(MsgBin) ->
     <<Opc:32/big, Dpc:32/big, Si:8, Ni:8, Mp:8, Sls:8, Payload/binary>> = MsgBin,
     %% The idea is to hand back a #mtp3_msg{} to make upper layers beyond
     %% MTP-TRANSFR.{ind,req} unaware of a MTP3 or M3UA lower layer
