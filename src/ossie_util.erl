@@ -270,8 +270,7 @@ decode_mcc_mnc(<<MCC2:4, MCC1:4, MNC3:4, MCC3:4, MNC2:4, MNC1:4>>) ->
 
 encode_mcc_mnc(MCCMNC) when length(MCCMNC) == 5 ->
     [MCC1, MCC2, MCC3, MNC1, MNC2] = lists:map(fun enc_tbcd_digit/1, MCCMNC),
-    <<MCC2:4, MCC1:4, 2#1111:4, MCC3:4, MNC2:4, MNC1:4>>
-    lists:map(fun enc_tbcd_digit/1, );
+    <<MCC2:4, MCC1:4, 2#1111:4, MCC3:4, MNC2:4, MNC1:4>>;
 encode_mcc_mnc(MCCMNC) when length(MCCMNC) == 6 ->
     [MCC1, MCC2, MCC3, MNC1, MNC2, MNC3] = lists:map(fun enc_tbcd_digit/1, MCCMNC),
     <<MCC2:4, MCC1:4, MNC3:4, MCC3:4, MNC2:4, MNC1:4>>.

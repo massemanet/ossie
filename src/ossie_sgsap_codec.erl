@@ -25,7 +25,7 @@ sgsap_params(sgsap_msgt_alert_reject, OptList) ->
       };
 sgsap_params(sgsap_msgt_alert_request, OptList) ->
     #sgsap_msg_params_alert_request{
-       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList)
       };
 sgsap_params(sgsap_msgt_downlink_unitdata, OptList) ->
     #sgsap_msg_params_downlink_unitdata{
@@ -34,7 +34,7 @@ sgsap_params(sgsap_msgt_downlink_unitdata, OptList) ->
       };
 sgsap_params(sgsap_msgt_eps_detach_ack, OptList) ->
     #sgsap_msg_params_eps_detach_ack{
-       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList)
       };
 sgsap_params(sgsap_msgt_eps_detach_indication, OptList) ->
     #sgsap_msg_params_eps_detach_indication{
@@ -44,7 +44,7 @@ sgsap_params(sgsap_msgt_eps_detach_indication, OptList) ->
       };
 sgsap_params(sgsap_msgt_imsi_detach_ack, OptList) ->
     #sgsap_msg_params_imsi_detach_ack{
-       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList)
       };
 sgsap_params(sgsap_msgt_imsi_detach_indication, OptList) ->
     #sgsap_msg_params_imsi_detach_indication{
@@ -65,7 +65,7 @@ sgsap_params(sgsap_msgt_location_update_reject, OptList) ->
        location_area_identifier = proplists:get_value(sgsap_iei_location_area_identifier, OptList, undefined)
       };
 sgsap_params(sgsap_msgt_location_update_request, OptList) ->
-    [LAI1|LAI2] = proplists:get_all_values(sgsap_iei_location_area_identifier, OptList)
+    [LAI1|LAI2] = proplists:get_all_values(sgsap_iei_location_area_identifier, OptList),
     #sgsap_msg_params_location_update_request{
        imsi = proplists:get_value(sgsap_iei_imsi, OptList),
        mme_name = proplists:get_value(sgsap_iei_mme_name, OptList),
@@ -176,12 +176,6 @@ sgsap_params(sgsap_msgt_mo_csfb_indication, OptList) ->
       };
 sgsap_params(sgsap_msgt_unknown, OptList) -> OptList.
 
-get_num_pad_bytes(BinLenBytes) ->
-    case BinLenBytes rem 2 of
-        0 ->    0;
-        Val ->  2 - Val
-    end.
-
 parse_sgsap_opts(OptBin) when is_binary(OptBin) ->
     parse_sgsap_opts(OptBin, []).
 
@@ -189,9 +183,7 @@ parse_sgsap_opts(<<>>, OptList) when is_list(OptList) ->
     OptList;
 parse_sgsap_opts(OptBin, OptList) when is_binary(OptBin), is_list(OptList) ->
     <<IEI:8/big, Length:8/big, Remain/binary>> = OptBin,
-    PadLen = get_num_pad_bytes(Length),
-    LengthNet = Length - 4,
-    <<CurOpt:LengthNet/binary, 0:PadLen/integer-unit:4, Remain2/binary>> = Remain,
+    <<CurOpt:Length/binary, Remain2/binary>> = Remain,
     NewOpt = parse_sgsap_opt(dec_iei(IEI), CurOpt),
     parse_sgsap_opts(Remain2, OptList ++ [NewOpt]).
 
@@ -214,7 +206,8 @@ parse_sgsap_opt(sgsap_iei_global_cn_id = Opt, OptBin) ->
 parse_sgsap_opt(sgsap_iei_imeisv = Opt, OptBin) ->
     {Opt, OptBin};
 parse_sgsap_opt(sgsap_iei_imsi = Opt, OptBin) ->
-    {Opt, OptBin};
+    %% 3GPP TS 29.018 - 18.4.10
+    {Opt, lists:nthtail(1, ossie_util:decode_tbcd(OptBin))};
 parse_sgsap_opt(sgsap_iei_imsi_detach_from_eps_service_type = Opt, OptBin) ->
     C = case OptBin of
             <<2#00000001:8>> -> network_initiated_imsi_detach_from_eps_services;
@@ -240,14 +233,49 @@ parse_sgsap_opt(sgsap_iei_lcs_indicator = Opt, OptBin) ->
         end,
     {Opt, C};
 parse_sgsap_opt(sgsap_iei_location_area_identifier = Opt, OptBin) ->
-    {Opt, OptBin};
+    <<M:3/binary, Lac/binary>> = OptBin,
+    MCCMNC = ossie_util:decode_mcc_mnc(M),
+    {Opt, {MCCMNC, Lac}};
 parse_sgsap_opt(sgsap_iei_mm_information = Opt, OptBin) ->
     {Opt, OptBin};
 parse_sgsap_opt(sgsap_iei_mme_name = Opt, OptBin) ->
-    Chars = [C || <<_L:8, C:8, _:8>> <= OptBin],
+    Chars = decode_name(OptBin),
     {Opt, Chars};
 parse_sgsap_opt(sgsap_iei_mobile_identity = Opt, OptBin) ->
-    {Opt, OptBin};
+    <<D1:4, _IsOdd:1, Type:3, R/binary>> = OptBin,
+    T = case Type of
+            2#001 -> imsi;
+            2#010 -> imei;
+            2#011 -> imeisv;
+            2#100 -> tmsi;
+            2#101 -> tmgi;
+            2#000 -> no_identity
+        end,
+    case T of
+        _ when T == imsi; T == imei; T == imeisv ->
+            [_|Ds] = ossie_util:decode_tbcd(<<D1:4, 0:4, R/binary>>),
+            {Opt, {T, Ds}};
+        tmsi ->
+            {Opt, {T, R}};
+        tmgi ->
+            <<_:2, Options:2>> = <<D1:4>>,
+            <<MBMSServiceId:3/binary, Extras/binary>> = R,
+            O = case Options of
+                    2#00 ->
+                        [];
+                    2#01 ->
+                        [{mcc_mnc, ossie_util:decode_mcc_mnc(Extras)}];
+                    2#10 ->
+                        [{mbms_session_id, Extras}];
+                    2#11 ->
+                        <<MCCMNC:3/binary, SessionId:1/binary>> = Extras,
+                        [{mcc_mnc, ossie_util:decode_mcc_mnc(MCCMNC)},
+                         {mbms_session_id, SessionId}]
+                end,
+            {Opt, [{mbms_service_id, MBMSServiceId}|O]};
+        no_identity ->
+            {Opt, no_identity}
+    end;
 parse_sgsap_opt(sgsap_iei_mobile_station_classmark_2 = Opt, OptBin) ->
     {Opt, OptBin};
 parse_sgsap_opt(sgsap_iei_nas_message_container = Opt, OptBin) ->
@@ -298,7 +326,7 @@ parse_sgsap_opt(sgsap_iei_ie_emm_mode = Opt, OptBin) ->
         end,
     {Opt, C};
 parse_sgsap_opt(sgsap_iei_vlr_name = Opt, OptBin) ->
-    Chars = [C || <<_L:8, C:8, _:8>> <= OptBin],
+    Chars = decode_name(OptBin),
     {Opt, Chars};
 parse_sgsap_opt(sgsap_iei_channel_needed = Opt, OptBin) ->
     {Opt, OptBin};
@@ -334,8 +362,18 @@ encode_sgsap_msg(#sgsap_msg{msg_type = MsgT, payload = OptList}) ->
     OptBin = encode_sgsap_opts(OptList),
     <<MsgType:8, OptBin/binary>>.
 
-encode_sgsap_opts(OptList) ->
+encode_sgsap_opts(_OptList) ->
     <<>>.
+
+decode_name(Bin) ->
+    lists:flatten(lists:join(".", decode_name(Bin, []))).
+
+decode_name(<<>>, Acc) ->
+    lists:reverse(Acc);
+decode_name(Bin, Acc) ->
+    <<L:8, R/binary>> = Bin,
+    <<C:L/binary, Rest/binary>> = R,
+    decode_name(Rest, [binary_to_list(C)|Acc]).
 
 parse_msg_type(?SGSAP_MSGT_PAGING_REQUEST) -> sgsap_msgt_paging_request;
 parse_msg_type(?SGSAP_MSGT_PAGING_REJECT) -> sgsap_msgt_paging_reject;
