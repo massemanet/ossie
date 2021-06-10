@@ -77,4 +77,115 @@
 -define(SGSAP_IEI_MAXIMUM_RETRANSMISSION_TIME, 2#00101101).
 -define(SGSAP_IEI_REQUESTED_RETRANSMISSION_TIME, 2#00101110).
 
+-record(sgsap_msg_params_alert_ack,
+        {imsi}).
+-record(sgsap_msg_params_alert_reject,
+        {imsi,
+         sgs_cause}).
+-record(sgsap_msg_params_alert_request,
+        {imsi}).
+-record(sgsap_msg_params_downlink_unitdata,
+        {imsi,
+         nas_message_container}).
+-record(sgsap_msg_params_eps_detach_ack,
+        {imsi}).
+-record(sgsap_msg_params_eps_detach_indication,
+        {imsi,
+         mme_name,
+         imsi_detach_from_eps_service_type}).
+-record(sgsap_msg_params_imsi_detach_ack,
+        {imsi}).
+-record(sgsap_msg_params_imsi_detach_indication,
+        {imsi,
+         mme_name,
+         imsi_detach_from_non_eps_service_type}).
+-record(sgsap_msg_params_location_update_accept,
+        {imsi,
+         location_area_identifier,
+         mobile_identity}).
+-record(sgsap_msg_params_location_update_reject,
+        {imsi,
+         reject_cause,
+         location_area_identifier}).
+-record(sgsap_msg_params_location_update_request,
+        {imsi,
+         mme_name,
+         eps_location_update_type,
+         new_location_area_identifier,
+         old_location_area_identifier,
+         tmsi_status,
+         imeisv,
+         tracking_area_identity,
+         e_utran_cell_global_identity,
+         tmsi_based_nri_container,
+         selected_cs_domain_operator}).
+-record(sgsap_msg_params_mm_information_request,
+        {imsi,
+         mm_information}).
+-record(sgsap_msg_params_paging_reject,
+        {imsi,
+         sgs_cause}).
+-record(sgsap_msg_params_paging_request,
+        {imsi,
+         vlr_name,
+         service_indicator,
+         tmsi,
+         cli,
+         ss_code,
+         lcs_indicator,
+         lcs_client_identity,
+         channel_needed,
+         emlpp_priority,
+         additional_paging_indicators,
+         sm_delivery_timer,
+         sm_delivery_start_time,
+         maximum_retransmission_time}).
+-record(sgsap_msg_params_reset_ack,
+        {mme_name,
+         vlr_name}).
+-record(sgsap_msg_params_reset_indication,
+        {mme_name,
+         vlr_name}).
+-record(sgsap_msg_params_service_request,
+        {imsi,
+         service_indicator,
+         imeisv,
+         ue_time_zone,
+         mobile_station_classmark_2,
+         tracking_area_identity,
+         e_utran_cell_global_identity,
+         ue_emm_mode}).
+-record(sgsap_msg_params_status,
+        {imsi,
+         sgs_cause,
+         erroneous_message}).
+-record(sgsap_msg_params_tmsi_reallocation_complete,
+        {imsi}).
+-record(sgsap_msg_params_ue_activity_indication,
+        {imsi,
+         maximum_ue_availability_time}).
+-record(sgsap_msg_params_ue_unreachable,
+        {imsi,
+         sgs_cause,
+         requested_retransmission_time,
+         additional_ue_unreachable_indicators}).
+-record(sgsap_msg_params_uplink_unitdata,
+        {imsi,
+         nas_message_container,
+         imeisv,
+         ue_time_zone,
+         mobile_station_classmark_2,
+         tracking_area_identity,
+         e_utran_cell_global_identity}).
+-record(sgsap_msg_params_release_request,
+        {imsi,
+         sgs_cause}).
+-record(sgsap_msg_params_service_abort_request,
+        {imsi}).
+-record(sgsap_msg_params_mo_csfb_indication,
+        {imsi,
+         tracking_area_identity,
+         e_utran_cell_global_identity}).
+
+
 -record(sgsap_msg, {msg_type, msg_length, payload}).

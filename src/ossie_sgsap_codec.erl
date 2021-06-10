@@ -13,60 +13,168 @@ parse_sgsap_msg(DataBin) when is_binary(DataBin) ->
 parse_sgsap_msg(Data) when is_list(Data) ->
     parse_sgsap_msg(list_to_binary(Data)).
 
-parse_msg_type(?SGSAP_MSGT_PAGING_REQUEST) -> sgsap_msgt_paging_request;
-parse_msg_type(?SGSAP_MSGT_PAGING_REJECT) -> sgsap_msgt_paging_reject;
-parse_msg_type(?SGSAP_MSGT_SERVICE_REQUEST) -> sgsap_msgt_service_request;
-parse_msg_type(?SGSAP_MSGT_DOWNLINK_UNITDATA) -> sgsap_msgt_downlink_unitdata;
-parse_msg_type(?SGSAP_MSGT_UPLINK_UNITDATA) -> sgsap_msgt_uplink_unitdata;
-parse_msg_type(?SGSAP_MSGT_LOCATION_UPDATE_REQUEST) -> sgsap_msgt_location_update_request;
-parse_msg_type(?SGSAP_MSGT_LOCATION_UPDATE_ACCEPT) -> sgsap_msgt_location_update_accept;
-parse_msg_type(?SGSAP_MSGT_LOCATION_UPDATE_REJECT) -> sgsap_msgt_location_update_reject;
-parse_msg_type(?SGSAP_MSGT_TMSI_REALLOCATION_COMPLETE) -> sgsap_msgt_tmsi_reallocation_complete;
-parse_msg_type(?SGSAP_MSGT_ALERT_REQUEST) -> sgsap_msgt_alert_request;
-parse_msg_type(?SGSAP_MSGT_ALERT_ACK) -> sgsap_msgt_alert_ack;
-parse_msg_type(?SGSAP_MSGT_ALERT_REJECT) -> sgsap_msgt_alert_reject;
-parse_msg_type(?SGSAP_MSGT_UE_ACTIVITY_INDICATION) -> sgsap_msgt_ue_activity_indication;
-parse_msg_type(?SGSAP_MSGT_EPS_DETACH_INDICATION) -> sgsap_msgt_eps_detach_indication;
-parse_msg_type(?SGSAP_MSGT_EPS_DETACH_ACK) -> sgsap_msgt_eps_detach_ack;
-parse_msg_type(?SGSAP_MSGT_IMSI_DETACH_INDICATION) -> sgsap_msgt_imsi_detach_indication;
-parse_msg_type(?SGSAP_MSGT_IMSI_DETACH_ACK) -> sgsap_msgt_imsi_detach_ack;
-parse_msg_type(?SGSAP_MSGT_RESET_INDICATION) -> sgsap_msgt_reset_indication;
-parse_msg_type(?SGSAP_MSGT_RESET_ACK) -> sgsap_msgt_reset_ack;
-parse_msg_type(?SGSAP_MSGT_SERVICE_ABORT_REQUEST) -> sgsap_msgt_service_abort_request;
-parse_msg_type(?SGSAP_MSGT_MO_CSFB_INDICATION) -> sgsap_msgt_mo_csfb_indication;
-parse_msg_type(?SGSAP_MSGT_MM_INFORMATION_REQUEST) -> sgsap_msgt_mm_information_request;
-parse_msg_type(?SGSAP_MSGT_RELEASE_REQUEST) -> sgsap_msgt_release_request;
-parse_msg_type(?SGSAP_MSGT_STATUS) -> sgsap_msgt_status;
-parse_msg_type(?SGSAP_MSGT_UE_UNREACHABLE) -> sgsap_msgt_ue_unreachable;
-parse_msg_type(_) -> sgsap_msgt_unknown.
-
 %% Chapter 8 Message functional definitions and contents
-sgsap_params(sgsap_msgt_alert_ack) -> [imsi];
-sgsap_params(sgsap_msgt_alert_reject) -> [imsi, sgs_cause];
-sgsap_params(sgsap_msgt_alert_request) -> [imsi];
-sgsap_params(sgsap_msgt_downlink_unitdata) -> [imsi, nas_message_container];
-sgsap_params(sgsap_msgt_eps_detach_ack) -> [imsi];
-sgsap_params(sgsap_msgt_eps_detach_indication) -> [imsi, mme_name, imsi_detach_from_eps_service_type];
-sgsap_params(sgsap_msgt_imsi_detach_ack) -> [imsi];
-sgsap_params(sgsap_msgt_imsi_detach_indication) -> [imsi, mme_name, imsi_detach_from_non_eps_service_type];
-sgsap_params(sgsap_msgt_location_update_accept) -> [imsi, location_area_identifier, mobile_identity];
-sgsap_params(sgsap_msgt_location_update_reject) -> [imsi, reject_cause, location_area_identifier];
-sgsap_params(sgsap_msgt_location_update_request) -> [imsi, mme_name, eps_location_update_type, {new_location_area_identifier, location_area_identifier}, {old_location_area_identifier, location_area_identifier}, tmsi_status, imeisv, tracking_area_identity, tracking_area_identity, tmsi_based_nri_container, selected_cs_domain_operator];
-sgsap_params(sgsap_msgt_mm_information_request) -> [imsi, mm_information];
-sgsap_params(sgsap_msgt_paging_reject) -> [imsi, sgs_cause];
-sgsap_params(sgsap_msgt_paging_request) -> [imsi, vlr_name, service_indicator, tmsi, cli, ss_code, lcs_indicator, lcs_client_identity, channel_needed, emlpp_priority, additional_paging_indicators, sm_delivery_timer, sm_delivery_start_time, maximum_retransmission_time];
-sgsap_params(sgsap_msgt_reset_ack) -> [mme_name, vlr_name];
-sgsap_params(sgsap_msgt_reset_indication) -> [mme_name, vlr_name];
-sgsap_params(sgsap_msgt_service_request) -> [imsi, service_indicator, imeisv, ue_time_zone, mobile_station_classmark_2, tracking_area_identity, e_utran_cell_global_identity, ue_emm_mode];
-sgsap_params(sgsap_msgt_status) -> [imsi, sgs_cause, erroneous_message];
-sgsap_params(sgsap_msgt_tmsi_reallocation_complete) -> [imsi];
-sgsap_params(sgsap_msgt_ue_activity_indication) -> [imsi, maximum_ue_availability_time];
-sgsap_params(sgsap_msgt_ue_unreachable) -> [imsi, sgs_cause, requested_retransmission_time, additional_ue_unreachable_indicators];
-sgsap_params(sgsap_msgt_uplink_unitdata) -> [imsi, nas_message_container, imeisv, ue_time_zone, mobile_station_classmark_2, tracking_area_identity, e_utran_cell_global_identity];
-sgsap_params(sgsap_msgt_release_request) -> [imsi, sgs_cause];
-sgsap_params(sgsap_msgt_service_abort_request) -> [imsi];
-sgsap_params(sgsap_msgt_mo_csfb_indication) -> [imsi, tracking_area_identity, e_utran_cell_global_identity];
-sgsap_params(sgsap_msgt_unknown) -> undefined.
+sgsap_params(sgsap_msgt_alert_ack, OptList) ->
+    #sgsap_msg_params_alert_ack{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList)
+      };
+sgsap_params(sgsap_msgt_alert_reject, OptList) ->
+    #sgsap_msg_params_alert_reject{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       sgs_cause = proplists:get_value(sgsap_iei_sgs_clause, OptList)
+      };
+sgsap_params(sgsap_msgt_alert_request, OptList) ->
+    #sgsap_msg_params_alert_request{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+      };
+sgsap_params(sgsap_msgt_downlink_unitdata, OptList) ->
+    #sgsap_msg_params_downlink_unitdata{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       nas_message_container = proplists:get_value(sgsap_iei_nas_message_container, OptList)
+      };
+sgsap_params(sgsap_msgt_eps_detach_ack, OptList) ->
+    #sgsap_msg_params_eps_detach_ack{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+      };
+sgsap_params(sgsap_msgt_eps_detach_indication, OptList) ->
+    #sgsap_msg_params_eps_detach_indication{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       mme_name = proplists:get_value(sgsap_iei_mme_name, OptList),
+       imsi_detach_from_eps_service_type = proplists:get_value(sgsap_iei_imsi_detach_from_eps_service_type, OptList)
+      };
+sgsap_params(sgsap_msgt_imsi_detach_ack, OptList) ->
+    #sgsap_msg_params_imsi_detach_ack{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+      };
+sgsap_params(sgsap_msgt_imsi_detach_indication, OptList) ->
+    #sgsap_msg_params_imsi_detach_indication{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       mme_name = proplists:get_value(sgsap_iei_mme_name, OptList),
+       imsi_detach_from_non_eps_service_type = proplists:get_value(sgsap_iei_imsi_detach_from_non_eps_service_type, OptList)
+      };
+sgsap_params(sgsap_msgt_location_update_accept, OptList) ->
+    #sgsap_msg_params_location_update_accept{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       location_area_identifier = proplists:get_value(sgsap_iei_location_area_identifier, OptList),
+       mobile_identity = proplists:get_value(sgsap_iei_mobile_identity, OptList, undefined)
+      };
+sgsap_params(sgsap_msgt_location_update_reject, OptList) ->
+    #sgsap_msg_params_location_update_reject{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       reject_cause = proplists:get_value(sgsap_iei_reject_cause, OptList),
+       location_area_identifier = proplists:get_value(sgsap_iei_location_area_identifier, OptList, undefined)
+      };
+sgsap_params(sgsap_msgt_location_update_request, OptList) ->
+    [LAI1|LAI2] = proplists:get_all_values(sgsap_iei_location_area_identifier, OptList)
+    #sgsap_msg_params_location_update_request{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       mme_name = proplists:get_value(sgsap_iei_mme_name, OptList),
+       eps_location_update_type = proplists:get_value(sgsap_iei_eps_location_update_type, OptList),
+       new_location_area_identifier = LAI1,
+       old_location_area_identifier = case LAI2 of [] -> undefined; [L|_] -> L end,
+       tmsi_status = proplists:get_value(sgsap_iei_tmsi_status, OptList, undefined),
+       imeisv = proplists:get_value(sgsap_iei_imeisv, OptList, undefined),
+       tracking_area_identity = proplists:get_value(sgsap_iei_tracking_area_identity, OptList, undefined),
+       e_utran_cell_global_identity = proplists:get_value(sgsap_iei_e_utran_cell_global_identity, OptList, undefined),
+       tmsi_based_nri_container = proplists:get_value(sgsap_iei_tmsi_based_nri_container, OptList, undefined),
+       selected_cs_domain_operator = proplists:get_value(sgsap_iei_selected_cs_domain_operator, OptList, undefined)
+      };
+sgsap_params(sgsap_msgt_mm_information_request, OptList) ->
+    #sgsap_msg_params_mm_information_request{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       mm_information = proplists:get_value(sgsap_iei_mm_information, OptList)
+      };
+sgsap_params(sgsap_msgt_paging_reject, OptList) ->
+    #sgsap_msg_params_paging_reject{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       sgs_cause = proplists:get_value(sgsap_iei_sgs_clause, OptList)
+      };
+sgsap_params(sgsap_msgt_paging_request, OptList) ->
+    #sgsap_msg_params_paging_request{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       vlr_name = proplists:get_value(sgsap_iei_vlr_name, OptList),
+       service_indicator = proplists:get_value(sgsap_iei_service_indicator, OptList),
+       tmsi = proplists:get_value(sgsap_iei_tmsi, OptList,  undefined),
+       cli = proplists:get_value(sgsap_iei_cli, OptList, undefined),
+       ss_code = proplists:get_value(sgsap_iei_ss_code, OptList, undefined),
+       lcs_indicator = proplists:get_value(sgsap_iei_lcs_indicator, OptList, undefined),
+       lcs_client_identity = proplists:get_value(sgsap_iei_lcs_client_identity, OptList, undefined),
+       channel_needed = proplists:get_value(sgsap_iei_channel_needed, OptList, undefined),
+       emlpp_priority = proplists:get_value(sgsap_iei_emlpp_priority, OptList, undefined),
+       additional_paging_indicators = proplists:get_value(sgsap_iei_additional_paging_indicators, OptList, undefined),
+       sm_delivery_timer = proplists:get_value(sgsap_iei_sm_delivery_timer, OptList, undefined),
+       sm_delivery_start_time = proplists:get_value(sgsap_iei_sm_delivery_start_time, OptList, undefined),
+       maximum_retransmission_time = proplists:get_value(sgsap_iei_maximum_retransmission_time, OptList, undefined)
+      };
+sgsap_params(sgsap_msgt_reset_ack, OptList) ->
+    #sgsap_msg_params_reset_ack{
+       mme_name = proplists:get_value(sgsap_iei_mme_name, OptList, undefined),
+       vlr_name = proplists:get_value(sgsap_iei_vlr_name, OptList, undefined)
+      };
+sgsap_params(sgsap_msgt_reset_indication, OptList) ->
+    #sgsap_msg_params_reset_indication{
+       mme_name = proplists:get_value(sgsap_iei_mme_name, OptList, undefined),
+       vlr_name = proplists:get_value(sgsap_iei_vlr_name, OptList, undefined)
+      };
+sgsap_params(sgsap_msgt_service_request, OptList) ->
+    #sgsap_msg_params_service_request{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       service_indicator = proplists:get_value(sgsap_iei_service_indicator, OptList),
+       imeisv = proplists:get_value(sgsap_iei_imeisv, OptList, undefined),
+       ue_time_zone = proplists:get_value(sgsap_iei_ue_time_zone, OptList, undefined),
+       mobile_station_classmark_2 = proplists:get_value(sgsap_iei_mobile_station_classmark_2, OptList, undefined),
+       tracking_area_identity = proplists:get_value(sgsap_iei_tracking_area_identity, OptList, undefined),
+       e_utran_cell_global_identity = proplists:get_value(sgsap_iei_e_utran_cell_global_identity, OptList, undefined),
+       ue_emm_mode = proplists:get_value(sgsap_iei_ue_emm_mode, OptList, undefined)
+      };
+sgsap_params(sgsap_msgt_status, OptList) ->
+    #sgsap_msg_params_status{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList, undefined),
+       sgs_cause = proplists:get_value(sgsap_iei_sgs_clause, OptList),
+       erroneous_message = proplists:get_value(sgsap_iei_erroneous_message, OptList)
+      };
+sgsap_params(sgsap_msgt_tmsi_reallocation_complete, OptList) ->
+    #sgsap_msg_params_tmsi_reallocation_complete{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList)
+      };
+sgsap_params(sgsap_msgt_ue_activity_indication, OptList) ->
+    #sgsap_msg_params_ue_activity_indication{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       maximum_ue_availability_time = proplists:get_value(sgsap_iei_maximum_ue_availability_time, OptList, undefined)
+      };
+sgsap_params(sgsap_msgt_ue_unreachable, OptList) ->
+    #sgsap_msg_params_ue_unreachable{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       sgs_cause = proplists:get_value(sgsap_iei_sgs_clause, OptList),
+       requested_retransmission_time = proplists:get_value(sgsap_iei_requested_retransmission_time, OptList, undefined),
+       additional_ue_unreachable_indicators = proplists:get_value(sgsap_iei_additional_ue_unreachable_indicators, OptList, undefined)
+      };
+sgsap_params(sgsap_msgt_uplink_unitdata, OptList) ->
+    #sgsap_msg_params_uplink_unitdata{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       nas_message_container = proplists:get_value(sgsap_iei_nas_message_container, OptList),
+       imeisv = proplists:get_value(sgsap_iei_imeisv, OptList, undefined),
+       ue_time_zone = proplists:get_value(sgsap_iei_ue_time_zone, OptList, undefined),
+       mobile_station_classmark_2 = proplists:get_value(sgsap_iei_mobile_station_classmark_2, OptList, undefined),
+       tracking_area_identity = proplists:get_value(sgsap_iei_tracking_area_identity, OptList, undefined),
+       e_utran_cell_global_identity = proplists:get_value(sgsap_iei_e_utran_cell_global_identity, OptList, undefined)
+      };
+sgsap_params(sgsap_msgt_release_request, OptList) ->
+    #sgsap_msg_params_release_request{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       sgs_cause = proplists:get_value(sgsap_iei_sgs_clause, OptList, undefined)
+      };
+sgsap_params(sgsap_msgt_service_abort_request, OptList) ->
+    #sgsap_msg_params_service_abort_request{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList)
+      };
+sgsap_params(sgsap_msgt_mo_csfb_indication, OptList) ->
+    #sgsap_msg_params_mo_csfb_indication{
+       imsi = proplists:get_value(sgsap_iei_imsi, OptList),
+       tracking_area_identity = proplists:get_value(sgsap_iei_tracking_area_identity, OptList, undefined),
+       e_utran_cell_global_identity = proplists:get_value(sgsap_iei_e_utran_cell_global_identity, OptList, undefined)
+      };
+sgsap_params(sgsap_msgt_unknown, OptList) -> OptList.
 
 get_num_pad_bytes(BinLenBytes) ->
     case BinLenBytes rem 2 of
@@ -220,6 +328,69 @@ parse_sgsap_opt(sgsap_iei_maximum_retransmission_time = Opt, OptBin) ->
     {Opt, OptBin};
 parse_sgsap_opt(sgsap_iei_requested_retransmission_time = Opt, OptBin) ->
     {Opt, OptBin}.
+
+encode_sgsap_msg(#sgsap_msg{msg_type = MsgT, payload = OptList}) ->
+    MsgType = enc_msg_type(MsgT),
+    OptBin = encode_sgsap_opts(OptList),
+    <<MsgType:8, OptBin/binary>>.
+
+encode_sgsap_opts(OptList) ->
+    <<>>.
+
+parse_msg_type(?SGSAP_MSGT_PAGING_REQUEST) -> sgsap_msgt_paging_request;
+parse_msg_type(?SGSAP_MSGT_PAGING_REJECT) -> sgsap_msgt_paging_reject;
+parse_msg_type(?SGSAP_MSGT_SERVICE_REQUEST) -> sgsap_msgt_service_request;
+parse_msg_type(?SGSAP_MSGT_DOWNLINK_UNITDATA) -> sgsap_msgt_downlink_unitdata;
+parse_msg_type(?SGSAP_MSGT_UPLINK_UNITDATA) -> sgsap_msgt_uplink_unitdata;
+parse_msg_type(?SGSAP_MSGT_LOCATION_UPDATE_REQUEST) -> sgsap_msgt_location_update_request;
+parse_msg_type(?SGSAP_MSGT_LOCATION_UPDATE_ACCEPT) -> sgsap_msgt_location_update_accept;
+parse_msg_type(?SGSAP_MSGT_LOCATION_UPDATE_REJECT) -> sgsap_msgt_location_update_reject;
+parse_msg_type(?SGSAP_MSGT_TMSI_REALLOCATION_COMPLETE) -> sgsap_msgt_tmsi_reallocation_complete;
+parse_msg_type(?SGSAP_MSGT_ALERT_REQUEST) -> sgsap_msgt_alert_request;
+parse_msg_type(?SGSAP_MSGT_ALERT_ACK) -> sgsap_msgt_alert_ack;
+parse_msg_type(?SGSAP_MSGT_ALERT_REJECT) -> sgsap_msgt_alert_reject;
+parse_msg_type(?SGSAP_MSGT_UE_ACTIVITY_INDICATION) -> sgsap_msgt_ue_activity_indication;
+parse_msg_type(?SGSAP_MSGT_EPS_DETACH_INDICATION) -> sgsap_msgt_eps_detach_indication;
+parse_msg_type(?SGSAP_MSGT_EPS_DETACH_ACK) -> sgsap_msgt_eps_detach_ack;
+parse_msg_type(?SGSAP_MSGT_IMSI_DETACH_INDICATION) -> sgsap_msgt_imsi_detach_indication;
+parse_msg_type(?SGSAP_MSGT_IMSI_DETACH_ACK) -> sgsap_msgt_imsi_detach_ack;
+parse_msg_type(?SGSAP_MSGT_RESET_INDICATION) -> sgsap_msgt_reset_indication;
+parse_msg_type(?SGSAP_MSGT_RESET_ACK) -> sgsap_msgt_reset_ack;
+parse_msg_type(?SGSAP_MSGT_SERVICE_ABORT_REQUEST) -> sgsap_msgt_service_abort_request;
+parse_msg_type(?SGSAP_MSGT_MO_CSFB_INDICATION) -> sgsap_msgt_mo_csfb_indication;
+parse_msg_type(?SGSAP_MSGT_MM_INFORMATION_REQUEST) -> sgsap_msgt_mm_information_request;
+parse_msg_type(?SGSAP_MSGT_RELEASE_REQUEST) -> sgsap_msgt_release_request;
+parse_msg_type(?SGSAP_MSGT_STATUS) -> sgsap_msgt_status;
+parse_msg_type(?SGSAP_MSGT_UE_UNREACHABLE) -> sgsap_msgt_ue_unreachable;
+parse_msg_type(MsgT) -> {sgsap_msgt_unknown, MsgT}.
+
+enc_msg_type(sgsap_msgt_paging_request) -> ?SGSAP_MSGT_PAGING_REQUEST;
+enc_msg_type(sgsap_msgt_paging_reject) -> ?SGSAP_MSGT_PAGING_REJECT;
+enc_msg_type(sgsap_msgt_service_request) -> ?SGSAP_MSGT_SERVICE_REQUEST;
+enc_msg_type(sgsap_msgt_downlink_unitdata) -> ?SGSAP_MSGT_DOWNLINK_UNITDATA;
+enc_msg_type(sgsap_msgt_uplink_unitdata) -> ?SGSAP_MSGT_UPLINK_UNITDATA;
+enc_msg_type(sgsap_msgt_location_update_request) -> ?SGSAP_MSGT_LOCATION_UPDATE_REQUEST;
+enc_msg_type(sgsap_msgt_location_update_accept) -> ?SGSAP_MSGT_LOCATION_UPDATE_ACCEPT;
+enc_msg_type(sgsap_msgt_location_update_reject) -> ?SGSAP_MSGT_LOCATION_UPDATE_REJECT;
+enc_msg_type(sgsap_msgt_tmsi_reallocation_complete) -> ?SGSAP_MSGT_TMSI_REALLOCATION_COMPLETE;
+enc_msg_type(sgsap_msgt_alert_request) -> ?SGSAP_MSGT_ALERT_REQUEST;
+enc_msg_type(sgsap_msgt_alert_ack) -> ?SGSAP_MSGT_ALERT_ACK;
+enc_msg_type(sgsap_msgt_alert_reject) -> ?SGSAP_MSGT_ALERT_REJECT;
+enc_msg_type(sgsap_msgt_ue_activity_indication) -> ?SGSAP_MSGT_UE_ACTIVITY_INDICATION;
+enc_msg_type(sgsap_msgt_eps_detach_indication) -> ?SGSAP_MSGT_EPS_DETACH_INDICATION;
+enc_msg_type(sgsap_msgt_eps_detach_ack) -> ?SGSAP_MSGT_EPS_DETACH_ACK;
+enc_msg_type(sgsap_msgt_imsi_detach_indication) -> ?SGSAP_MSGT_IMSI_DETACH_INDICATION;
+enc_msg_type(sgsap_msgt_imsi_detach_ack) -> ?SGSAP_MSGT_IMSI_DETACH_ACK;
+enc_msg_type(sgsap_msgt_reset_indication) -> ?SGSAP_MSGT_RESET_INDICATION;
+enc_msg_type(sgsap_msgt_reset_ack) -> ?SGSAP_MSGT_RESET_ACK;
+enc_msg_type(sgsap_msgt_service_abort_request) -> ?SGSAP_MSGT_SERVICE_ABORT_REQUEST;
+enc_msg_type(sgsap_msgt_mo_csfb_indication) -> ?SGSAP_MSGT_MO_CSFB_INDICATION;
+enc_msg_type(sgsap_msgt_mm_information_request) -> ?SGSAP_MSGT_MM_INFORMATION_REQUEST;
+enc_msg_type(sgsap_msgt_release_request) -> ?SGSAP_MSGT_RELEASE_REQUEST;
+enc_msg_type(sgsap_msgt_status) -> ?SGSAP_MSGT_STATUS;
+enc_msg_type(sgsap_msgt_ue_unreachable) -> ?SGSAP_MSGT_UE_UNREACHABLE;
+enc_msg_type({sgsap_msgt_unknown, MsgT}) -> MsgT.
+
 
 dec_iei(?SGSAP_IEI_IMSI) -> sgsap_iei_imsi;
 dec_iei(?SGSAP_IEI_VLR_NAME) -> sgsap_iei_vlr_name;
