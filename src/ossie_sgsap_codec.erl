@@ -237,7 +237,8 @@ parse_sgsap_opt(sgsap_iei_location_area_identifier = Opt, OptBin) ->
     MCCMNC = ossie_util:decode_mcc_mnc(M),
     {Opt, {MCCMNC, Lac}};
 parse_sgsap_opt(sgsap_iei_mm_information = Opt, OptBin) ->
-    {Opt, OptBin};
+    MM = decode_mm_information(OptBin),
+    {Opt, MM};
 parse_sgsap_opt(sgsap_iei_mme_name = Opt, OptBin) ->
     Chars = decode_name(OptBin),
     {Opt, Chars};
@@ -374,6 +375,38 @@ decode_name(Bin, Acc) ->
     <<L:8, R/binary>> = Bin,
     <<C:L/binary, Rest/binary>> = R,
     decode_name(Rest, [binary_to_list(C)|Acc]).
+
+-define(MM_IEI_FULL_NAME_FOR_NETWORK, 16#43).
+-define(MM_IEI_SHORT_NAME_FOR_NETWORK, 16#45).
+-define(MM_IEI_LOCAL_TIME_ZONE, 16#46).
+-define(MM_IEI_UNIVERSAL_TIME_AND_LOCAL_TIME_ZONE , 16#47).
+-define(MM_IEI_LSA_IDENTITY, 16#48).
+-define(MM_IEI_NETWORK_DAYLIGHT_SAVING_TIME, 16#49).
+
+decode_mm_information(<<>>) ->
+    [];
+decode_mm_information(<<?MM_IEI_FULL_NAME_FOR_NETWORK:8, L:8, R/binary>>) ->
+    <<Name:L/binary, Rest/binary>> = R,
+    [{full_name_for_network, decode_network_name(Name)}|decode_mm_information(Rest)];
+decode_mm_information(<<?MM_IEI_SHORT_NAME_FOR_NETWORK:8, L:8, R/binary>>) ->
+    <<Name:L/binary, Rest/binary>> = R,
+    [{short_name_for_network, decode_network_name(Name)}|decode_mm_information(Rest)];
+decode_mm_information(<<?MM_IEI_LOCAL_TIME_ZONE:8, Tz:1/binary, R/binary>>) ->
+    [{local_time_zone, Tz}|decode_mm_information(R)];
+decode_mm_information(<<?MM_IEI_UNIVERSAL_TIME_AND_LOCAL_TIME_ZONE:8, Tz:7/binary, R/binary>>) ->
+    [{universal_time_zone_and_local_time_zone, Tz}|decode_mm_information(R)];
+decode_mm_information(<<?MM_IEI_LSA_IDENTITY:8, L:8, R/binary>>) ->
+    <<Identity:L/binary, Rest/binary>> = R,
+    [{lsa_identity, Identity}|decode_mm_information(Rest)];
+decode_mm_information(<<?MM_IEI_NETWORK_DAYLIGHT_SAVING_TIME:8, L:8, R/binary>>) ->
+    <<DST:L/binary, Rest/binary>> = R,
+    [{network_daylight_saving_time, DST}|decode_mm_information(Rest)].
+
+decode_network_name(Bin) ->
+    <<_:1, _IEI:7, _L:8, Ext:1, CodingScheme:3, AddCI:1, NumSpares:3, Rest/binary>> = B,
+    <<String/binary, 0:NumSpares>> = Rest,
+    String.
+
 
 parse_msg_type(?SGSAP_MSGT_PAGING_REQUEST) -> sgsap_msgt_paging_request;
 parse_msg_type(?SGSAP_MSGT_PAGING_REJECT) -> sgsap_msgt_paging_reject;
