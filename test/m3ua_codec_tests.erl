@@ -90,8 +90,8 @@ parse_m3ua(DataBin) ->
     handle_m3ua(M3ua),
     ?assertEqual(DataBin, NewBin).
 
-handle_m3ua(#m3ua_msg{msg_class = ?M3UA_MSGC_TRANSFER,
-                      msg_type = ?M3UA_MSGT_XFR_DATA,
+handle_m3ua(#m3ua_msg{msg_class = m3ua_msgc_transfer,
+                      msg_type = m3ua_msgt_xfr_data,
                       payload = OptList}) ->
     Mtp3 = proplists:get_value(m3ua_iei_protocol_data, OptList),
     handle_mtp3(Mtp3);
