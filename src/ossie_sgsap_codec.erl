@@ -319,10 +319,10 @@ parse_sgsap_opt(sgsap_iei_tracking_area_identity = Opt, OptBin) ->
     {Opt, OptBin};
 parse_sgsap_opt(sgsap_iei_ue_time_zone = Opt, OptBin) ->
     {Opt, OptBin};
-parse_sgsap_opt(sgsap_iei_ie_emm_mode = Opt, OptBin) ->
+parse_sgsap_opt(sgsap_iei_ue_emm_mode = Opt, OptBin) ->
     C = case OptBin of
-            <<2#00000001:8>> -> emm_idle;
-            <<2#00000010:8>> -> emm_connected;
+            <<2#00000000:8>> -> emm_idle;
+            <<2#00000001:8>> -> emm_connected;
             _ -> {reserved, OptBin}
         end,
     {Opt, C};
@@ -393,8 +393,23 @@ decode_mm_information(<<?MM_IEI_SHORT_NAME_FOR_NETWORK:8, L:8, R/binary>>) ->
     [{short_name_for_network, decode_network_name(Name)}|decode_mm_information(Rest)];
 decode_mm_information(<<?MM_IEI_LOCAL_TIME_ZONE:8, Tz:1/binary, R/binary>>) ->
     [{local_time_zone, Tz}|decode_mm_information(R)];
-decode_mm_information(<<?MM_IEI_UNIVERSAL_TIME_AND_LOCAL_TIME_ZONE:8, Tz:7/binary, R/binary>>) ->
-    [{universal_time_zone_and_local_time_zone, Tz}|decode_mm_information(R)];
+decode_mm_information(<<?MM_IEI_UNIVERSAL_TIME_AND_LOCAL_TIME_ZONE:8, Time:7/binary, R/binary>>) ->
+    %% 3GPP TS 23.040 - 9.2.3.11 TP-Service-Centre-Time-Stamp (TP-SCTS)
+    io:format(user, "WHA: ~p~n", [Time]),
+    <<Y2:4, Y1:4, M2:4, M1:4, D2:4, D1:4, H2:4, H1:4, Mi2:4, Mi1:4, S2:4, S1:4, TzRaw/binary>> = Time,
+    Y = 2000+Y1*10+Y2,
+    M = M1*10+M2,
+    D = D1*10+D2,
+    H = H1*10+H2,
+    Mi = Mi1*10+Mi2,
+    S = S1*10+S2,
+    <<Tz2:4, TzSign:1, Tz1:3>> = TzRaw,
+    <<TzQuarters>> = <<0:1, Tz1:3, Tz2:4>>,
+    Tz = case TzSign of
+             1 -> [$-, TzQuarters];
+             0 -> [$+, TzQuarters]
+         end,
+    [{universal_time_zone_and_local_time_zone, {{{Y, M, D}, {H, Mi, S}}, Tz}}|decode_mm_information(R)];
 decode_mm_information(<<?MM_IEI_LSA_IDENTITY:8, L:8, R/binary>>) ->
     <<Identity:L/binary, Rest/binary>> = R,
     [{lsa_identity, Identity}|decode_mm_information(Rest)];
@@ -403,10 +418,15 @@ decode_mm_information(<<?MM_IEI_NETWORK_DAYLIGHT_SAVING_TIME:8, L:8, R/binary>>)
     [{network_daylight_saving_time, DST}|decode_mm_information(Rest)].
 
 decode_network_name(Bin) ->
-    <<_:1, _IEI:7, _L:8, Ext:1, CodingScheme:3, AddCI:1, NumSpares:3, Rest/binary>> = B,
-    <<String/binary, 0:NumSpares>> = Rest,
-    String.
-
+    <<_Ext:1, CodingScheme:3, _AddCI:1, NumSpares:3, Rest/binary>> = Bin,
+    case CodingScheme of
+        0 -> %% GSM default alphabet, language unspecified, 3GPP TS 23.038
+            ossie_util:decode_gsm_string(Rest, NumSpares);
+        1 -> %% UCS2 (16 bit)
+            Bin;
+        _ -> %% reserved
+            Bin
+    end.
 
 parse_msg_type(?SGSAP_MSGT_PAGING_REQUEST) -> sgsap_msgt_paging_request;
 parse_msg_type(?SGSAP_MSGT_PAGING_REJECT) -> sgsap_msgt_paging_reject;
