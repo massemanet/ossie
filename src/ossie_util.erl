@@ -43,7 +43,7 @@
 -export([get_env/2, get_env/3]).
 -export([decode_tbcd/1, encode_tbcd/1]).
 -export([decode_mcc_mnc/1, encode_mcc_mnc/1]).
--export([decode_gsm_string/2]).
+-export([decode_gsm_string/2, encode_gsm_string/2]).
 
 -include_lib("include/util.hrl").
 
@@ -282,6 +282,11 @@ decode_gsm_string(Packed, NumSpares) ->
     <<0:NumSpares, Unpadded/bits>> = Reversed,
     Unpacked = << <<X:8>> || <<X:7>> <= Unpadded >>,
     binary_to_list(reverse_binary(Unpacked)).
+encode_gsm_string(String, NumSpares) ->
+    Unpacked = reverse_binary(list_to_binary(String)),
+    Packed = << <<X:7>> || <<X:8>> <= Unpacked >>,
+    Reversed = <<0:NumSpares, Packed/bits>>,
+    reverse_binary(Reversed).
 
 reverse_binary(Bin) ->
     binary:encode_unsigned(binary:decode_unsigned(Bin, little), big).

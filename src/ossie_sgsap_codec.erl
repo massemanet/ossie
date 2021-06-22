@@ -442,40 +442,53 @@ encode_sgsap_opt(sgsap_iei_mme_name = Opt, Chars) ->
     OptBin = encode_name(Chars),
     Length = byte_size(OptBin),
     <<IEI, Length, OptBin>>;
-encode_sgsap_opt(sgsap_iei_mobile_identity = Opt, OptBin) ->
-    <<D1:4, _IsOdd:1, Type:3, R/binary>> = OptBin,
-    T = case Type of
-            2#001 -> imsi;
-            2#010 -> imei;
-            2#011 -> imeisv;
-            2#100 -> tmsi;
-            2#101 -> tmgi;
-            2#000 -> no_identity
-        end,
-    case T of
-        _ when T == imsi; T == imei; T == imeisv ->
-            [_|Ds] = ossie_util:decode_tbcd(<<D1:4, 0:4, R/binary>>),
-            {Opt, {T, Ds}};
-        tmsi ->
-            {Opt, {T, R}};
-        tmgi ->
-            <<_:2, Options:2>> = <<D1:4>>,
-            <<MBMSServiceId:3/binary, Extras/binary>> = R,
-            O = case Options of
-                    2#00 ->
-                        [];
-                    2#01 ->
-                        [{mcc_mnc, ossie_util:decode_mcc_mnc(Extras)}];
-                    2#10 ->
-                        [{mbms_session_id, Extras}];
-                    2#11 ->
-                        <<MCCMNC:3/binary, SessionId:1/binary>> = Extras,
-                        [{mcc_mnc, ossie_util:decode_mcc_mnc(MCCMNC)},
-                         {mbms_session_id, SessionId}]
-                end,
-            {Opt, [{mbms_service_id, MBMSServiceId}|O]};
+encode_sgsap_opt(sgsap_iei_mobile_identity = Opt, Option) ->
+    case Option of
+        {imsi, Ds} ->
+            IsOdd = length(Ds) rem 2,
+            Type = 2#001,
+            <<_D1:4, _IsOdd:1, _Type:3, _R/binary>> = ossie_util:encode_tbcd([IsOdd*8+Type|Ds]);
+        {imei, Ds} ->
+            IsOdd = length(Ds) rem 2,
+            Type = 2#010,
+            <<_D1:4, _IsOdd:1, _Type:3, _R/binary>> = ossie_util:encode_tbcd([IsOdd*8+Type|Ds]);
+        {imeisv, Ds} ->
+            IsOdd = length(Ds) rem 2,
+            Type = 2#011,
+            <<_D1:4, _IsOdd:1, _Type:3, _R/binary>> = ossie_util:encode_tbcd([IsOdd*8+Type|Ds]);
+        {tmsi, R} ->
+            D1 = 0,
+            IsOdd = 0,
+            Type = 2#100,
+            <<D1:4, IsOdd:1, Type:3, R/binary>>;
+        {tmgi, Opts} ->
+            IsOdd = 0,
+            Type = 2#101,
+            MBMSServiceId = proplists:get_value(mbms_service_id, Opts),
+            {O1, V1} = case proplists:is_defined(mcc_mnc, Opts) of
+                           true ->
+                               MCCMNC = proplists:get_value(mcc_mnc, Opts),
+                               EncMCCMNC = ossie_util:encode_mcc_mnc(MCCMNC),
+                               {2#01, <<EncMCCMNC:3/binary>>};
+                           false ->
+                               {2#00, <<>>}
+                       end,
+            {O2, V2} = case proplists:is_defined(mbms_session_id, Opts) of
+                           true ->
+                               SessionId = proplists:get_value(mbms_session_id, Opts),
+                               {2#10, <<SessionId:1/binary>>};
+                           false ->
+                               {2#00, <<>>}
+                       end,
+            Options = O1+O2,
+            Extras = <<V1, V2>>,
+            <<0:2, Options:2, IsOdd:1, Type:3, MBMSServiceId:3/binary, Extras/binary>>;
         no_identity ->
-            {Opt, no_identity}
+            D1 = 0,
+            IsOdd = 0,
+            Type = 2#000,
+            R = <<>>,
+            <<D1:4, IsOdd:1, Type:3, R/binary>>
     end;
 encode_sgsap_opt(sgsap_iei_mobile_station_classmark_2 = Opt, OptBin) ->
     IEI = enc_iei(Opt),
@@ -489,32 +502,35 @@ encode_sgsap_opt(sgsap_iei_reject_cause = Opt, OptBin) ->
     IEI = enc_iei(Opt),
     Length = byte_size(OptBin),
     <<IEI, Length, OptBin>>;
-encode_sgsap_opt(sgsap_iei_service_indicator = Opt, OptBin) ->
-    C = case OptBin of
-            <<2#00000001:8>> -> cs_call_indicator;
-            <<2#00000010:8>> -> sms_indicator;
-            _ -> cs_call_indicator
-        end,
-    {Opt, C};
-encode_sgsap_opt(sgsap_iei_sgs_cause = Opt, OptBin) ->
-    C = case OptBin of
-            <<2#00000001:8>> -> imsi_detached_for_eps_services;
-            <<2#00000010:8>> -> imsi_detached_for_eps_and_non_eps_services;
-            <<2#00000011:8>> -> imsi_unknown;
-            <<2#00000100:8>> -> imsi_detached_for_non_eps_services;
-            <<2#00000101:8>> -> imsi_implicitly_detached_for_non_eps_services;
-            <<2#00000110:8>> -> ue_unreachable;
-            <<2#00000111:8>> -> message_not_compatible_with_the_protocol_state;
-            <<2#00001000:8>> -> missing_mandatory_information_element;
-            <<2#00001001:8>> -> invalid_mandatory_information;
-            <<2#00001010:8>> -> conditional_information_element_error;
-            <<2#00001011:8>> -> semantically_incorrect_message;
-            <<2#00001100:8>> -> message_unknown;
-            <<2#00001101:8>> -> mobile_terminating_cs_fallback_call_rejected_by_the_user;
-            <<2#00001110:8>> -> ue_temporarily_unreachable;
-            _ -> {unspecified, OptBin}
-        end,
-    {Opt, C};
+encode_sgsap_opt(sgsap_iei_service_indicator = Opt, Option) ->
+    IEI = enc_iei(Opt),
+    OptBin = case Option of
+                 cs_call_indicator -> <<2#00000001:8>>;
+                 sms_indicator -> <<2#00000010:8>>
+             end,
+    Length = byte_size(OptBin),
+    <<IEI, Length, OptBin>>;
+encode_sgsap_opt(sgsap_iei_sgs_cause = Opt, Option) ->
+    IEI = enc_iei(Opt),
+    OptBin = case Option of
+                 imsi_detached_for_eps_services -> <<2#00000001:8>>;
+                 imsi_detached_for_eps_and_non_eps_services -> <<2#00000010:8>>;
+                 imsi_unknown -> <<2#00000011:8>>;
+                 imsi_detached_for_non_eps_services -> <<2#00000100:8>>;
+                 imsi_implicitly_detached_for_non_eps_services -> <<2#00000101:8>>;
+                 ue_unreachable -> <<2#00000110:8>>;
+                 message_not_compatible_with_the_protocol_state -> <<2#00000111:8>>;
+                 missing_mandatory_information_element -> <<2#00001000:8>>;
+                 invalid_mandatory_information -> <<2#00001001:8>>;
+                 conditional_information_element_error -> <<2#00001010:8>>;
+                 semantically_incorrect_message -> <<2#00001011:8>>;
+                 message_unknown -> <<2#00001100:8>>;
+                 mobile_terminating_cs_fallback_call_rejected_by_the_user -> <<2#00001101:8>>;
+                 ue_temporarily_unreachable -> <<2#00001110:8>>;
+                 {unspecified, Bin} -> Bin
+             end,
+    Length = byte_size(OptBin),
+    <<IEI, Length, OptBin>>;
 encode_sgsap_opt(sgsap_iei_ss_code = Opt, OptBin) ->
     IEI = enc_iei(Opt),
     Length = byte_size(OptBin),
@@ -535,16 +551,20 @@ encode_sgsap_opt(sgsap_iei_ue_time_zone = Opt, OptBin) ->
     IEI = enc_iei(Opt),
     Length = byte_size(OptBin),
     <<IEI, Length, OptBin>>;
-encode_sgsap_opt(sgsap_iei_ue_emm_mode = Opt, OptBin) ->
-    C = case OptBin of
-            <<2#00000000:8>> -> emm_idle;
-            <<2#00000001:8>> -> emm_connected;
-            _ -> {reserved, OptBin}
-        end,
-    {Opt, C};
-encode_sgsap_opt(sgsap_iei_vlr_name = Opt, OptBin) ->
-    Chars = decode_name(OptBin),
-    {Opt, Chars};
+encode_sgsap_opt(sgsap_iei_ue_emm_mode = Opt, Option) ->
+    IEI = enc_iei(Opt),
+    OptBin = case Option of
+                 emm_idle -> <<2#00000000:8>>;
+                 emm_connected -> <<2#00000001:8>>;
+                 {reserved, Bin} -> Bin
+             end,
+    Length = byte_size(OptBin),
+    <<IEI, Length, OptBin>>;
+encode_sgsap_opt(sgsap_iei_vlr_name = Opt, Chars) ->
+    IEI = enc_iei(Opt),
+    OptBin = encode_name(Chars),
+    Length = byte_size(OptBin),
+    <<IEI, Length, OptBin>>;
 encode_sgsap_opt(sgsap_iei_channel_needed = Opt, OptBin) ->
     IEI = enc_iei(Opt),
     Length = byte_size(OptBin),
@@ -553,12 +573,14 @@ encode_sgsap_opt(sgsap_iei_emlpp_priority = Opt, OptBin) ->
     IEI = enc_iei(Opt),
     Length = byte_size(OptBin),
     <<IEI, Length, OptBin>>;
-encode_sgsap_opt(sgsap_iei_additional_paging_indicators = Opt, OptBin) ->
-    C = case OptBin of
-            <<0:7, 2#1:1>> -> cs_restore_indicator_not_set;
-            <<0:7, 2#0:1>> -> cs_restore_indicator_set
-        end,
-    {Opt, C};
+encode_sgsap_opt(sgsap_iei_additional_paging_indicators = Opt, Option) ->
+    IEI = enc_iei(Opt),
+    OptBin = case Option of
+                 cs_restore_indicator_not_set -> <<0:7, 2#1:1>>;
+                 cs_restore_indicator_set -> <<0:7, 2#0:1>>
+             end,
+    Length = byte_size(OptBin),
+    <<IEI, Length, OptBin>>;
 encode_sgsap_opt(sgsap_iei_tmsi_based_nri_container = Opt, OptBin) ->
     IEI = enc_iei(Opt),
     Length = byte_size(OptBin),
@@ -575,12 +597,14 @@ encode_sgsap_opt(sgsap_iei_sm_delivery_start_time = Opt, OptBin) ->
     IEI = enc_iei(Opt),
     Length = byte_size(OptBin),
     <<IEI, Length, OptBin>>;
-encode_sgsap_opt(sgsap_iei_additional_ue_unreachable_indicators = Opt, OptBin) ->
-    C = case OptBin of
-            <<0:7, 2#1:1>> -> sm_buffer_request_indicator_not_set;
-            <<0:7, 2#0:1>> -> sm_buffer_request_indicator_set
-        end,
-    {Opt, C};
+encode_sgsap_opt(sgsap_iei_additional_ue_unreachable_indicators = Opt, Option) ->
+    IEI = enc_iei(Opt),
+    OptBin = case Option of
+                 sm_buffer_request_indicator_not_set -> <<0:7, 2#1:1>>;
+                 sm_buffer_request_indicator_set -> <<0:7, 2#0:1>>
+             end,
+    Length = byte_size(OptBin),
+    <<IEI, Length, OptBin>>;
 encode_sgsap_opt(sgsap_iei_maximum_retransmission_time = Opt, OptBin) ->
     IEI = enc_iei(Opt),
     Length = byte_size(OptBin),
@@ -713,6 +737,8 @@ encode_sgsap_opts(OptList) when is_list(OptList) ->
 
 encode_sgsap_opts([], OptBin) when is_binary(OptBin) ->
     OptBin;
+encode_sgsap_opts([{_, undefined}|OptList], OptBin) when is_list(OptList), is_binary(OptBin) ->
+    encode_sgsap_opts(OptList, OptBin);
 encode_sgsap_opts([{K, V}|OptList], OptBin) when is_list(OptList), is_binary(OptBin) ->
     IEI = enc_iei(K),
     CurOpt = encode_sgsap_opt(K, V),
@@ -730,6 +756,18 @@ decode_name(Bin, Acc) ->
     <<L:8, R/binary>> = Bin,
     <<C:L/binary, Rest/binary>> = R,
     decode_name(Rest, [binary_to_list(C)|Acc]).
+
+encode_name(String) ->
+    Groups = string:split(String, ".", all),
+    encode_name(Groups, <<>>).
+
+encode_name([], Acc) ->
+    Acc;
+encode_name([L|Rest], Acc) ->
+    Bin = list_to_binary(L),
+    Length = byte_size(Bin),
+    encode_name(Rest, <<Length, Bin, Acc>>).
+
 
 -define(MM_IEI_FULL_NAME_FOR_NETWORK, 16#43).
 -define(MM_IEI_SHORT_NAME_FOR_NETWORK, 16#45).
@@ -772,6 +810,42 @@ decode_mm_information(<<?MM_IEI_NETWORK_DAYLIGHT_SAVING_TIME:8, L:8, R/binary>>)
     <<DST:L/binary, Rest/binary>> = R,
     [{network_daylight_saving_time, DST}|decode_mm_information(Rest)].
 
+encode_mm_information([]) ->
+    <<>>;
+encode_mm_information([{full_name_for_network, FullName}|Rest]) ->
+    EncName = encode_network_name(FullName),
+    Length = byte_size(EncName),
+    <<?MM_IEI_FULL_NAME_FOR_NETWORK:8, Length:8, EncName, (encode_mm_information(Rest))/binary>>;
+encode_mm_information(<<?MM_IEI_SHORT_NAME_FOR_NETWORK:8, L:8, R/binary>>) ->
+    <<Name:L/binary, Rest/binary>> = R,
+    [{short_name_for_network, decode_network_name(Name)}|encode_mm_information(Rest)];
+encode_mm_information(<<?MM_IEI_LOCAL_TIME_ZONE:8, Tz:1/binary, R/binary>>) ->
+    [{local_time_zone, Tz}|encode_mm_information(R)];
+encode_mm_information(<<?MM_IEI_UNIVERSAL_TIME_AND_LOCAL_TIME_ZONE:8, Time:7/binary, R/binary>>) ->
+    %% 3GPP TS 23.040 - 9.2.3.11 TP-Service-Centre-Time-Stamp (TP-SCTS)
+    io:format(user, "WHA: ~p~n", [Time]),
+    <<Y2:4, Y1:4, M2:4, M1:4, D2:4, D1:4, H2:4, H1:4, Mi2:4, Mi1:4, S2:4, S1:4, TzRaw/binary>> = Time,
+    Y = 2000+Y1*10+Y2,
+    M = M1*10+M2,
+    D = D1*10+D2,
+    H = H1*10+H2,
+    Mi = Mi1*10+Mi2,
+    S = S1*10+S2,
+    <<Tz2:4, TzSign:1, Tz1:3>> = TzRaw,
+    <<TzQuarters>> = <<0:1, Tz1:3, Tz2:4>>,
+    Tz = case TzSign of
+             1 -> [$-, TzQuarters];
+             0 -> [$+, TzQuarters]
+         end,
+    [{universal_time_zone_and_local_time_zone, {{{Y, M, D}, {H, Mi, S}}, Tz}}|encode_mm_information(R)];
+encode_mm_information(<<?MM_IEI_LSA_IDENTITY:8, L:8, R/binary>>) ->
+    <<Identity:L/binary, Rest/binary>> = R,
+    [{lsa_identity, Identity}|encode_mm_information(Rest)];
+encode_mm_information(<<?MM_IEI_NETWORK_DAYLIGHT_SAVING_TIME:8, L:8, R/binary>>) ->
+    <<DST:L/binary, Rest/binary>> = R,
+    [{network_daylight_saving_time, DST}|encode_mm_information(Rest)].
+
+
 decode_network_name(Bin) ->
     <<_Ext:1, CodingScheme:3, _AddCI:1, NumSpares:3, Rest/binary>> = Bin,
     case CodingScheme of
@@ -782,6 +856,14 @@ decode_network_name(Bin) ->
         _ -> %% reserved
             Bin
     end.
+
+encode_network_name(Bin) when is_binary(Bin) ->
+    Bin;
+encode_network_name(GsmString) when is_list(GsmString) ->
+    NumSpares = length(GsmString) rem 7,
+    Bin = ossie_util:encode_gsm_string(GsmString, NumSpares),
+    CodingScheme = 0, %% GSM - only one we know right now
+    <<0:1, CodingScheme:3, 0:1, NumSpares:3, Bin/binary>>.
 
 parse_msg_type(?SGSAP_MSGT_PAGING_REQUEST) -> sgsap_msgt_paging_request;
 parse_msg_type(?SGSAP_MSGT_PAGING_REJECT) -> sgsap_msgt_paging_reject;
