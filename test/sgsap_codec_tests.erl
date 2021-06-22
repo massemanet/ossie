@@ -64,7 +64,6 @@ sgsap_mo_csfb_indication_test() ->
 
 parse_sgsap(DataBin) ->
     SGsAP = ossie_sgsap_codec:parse_sgsap_msg(DataBin),
-    ?debugVal(SGsAP)%% ,
-    %% NewBin = ossie_sgsap_codec:encode_sgsap_msg(SGsAP),
-    %% ?assertEqual(DataBin, NewBin)
-        .
+    ?debugVal(SGsAP),
+    NewBin = ossie_sgsap_codec:encode_sgsap_msg(SGsAP),
+    ?assertEqual(DataBin, NewBin).
