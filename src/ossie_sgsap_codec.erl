@@ -700,7 +700,7 @@ encode_mm_information([{lsa_identity, Identity}|Rest]) ->
     <<?MM_IEI_LSA_IDENTITY:8, Length:8, (encode_mm_information(Rest))/binary>>;
 encode_mm_information([{network_daylight_saving_time, DST}|Rest]) ->
     Length = byte_size(DST),
-    <<?MM_IEI_NETWORK_DAYLIGHT_SAVING_TIME:8, Length:8, DST, (encode_mm_information(Rest))/binary>>.
+    <<?MM_IEI_NETWORK_DAYLIGHT_SAVING_TIME:8, Length:8, DST/binary, (encode_mm_information(Rest))/binary>>.
 
 decode_time(<<>>) ->
     [];
