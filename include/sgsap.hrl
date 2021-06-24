@@ -131,6 +131,8 @@
          service_indicator,
          tmsi,
          cli,
+         location_area_identifier,
+         global_cn_id,
          ss_code,
          lcs_indicator,
          lcs_client_identity,
