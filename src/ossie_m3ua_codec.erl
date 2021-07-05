@@ -46,8 +46,9 @@ get_num_pad_bytes(BinLenBytes) ->
     end.
 
 parse_m3ua_msg(DataBin) when is_binary(DataBin) ->
-    <<Version:8, _Reserved:8, MsgClass:8, MsgType:8, MsgLen:32/big, Remain/binary>> = DataBin,
+    <<Version:8, _Reserved:8, MsgC:8, MsgT:8, MsgLen:32/big, Remain/binary>> = DataBin,
     OptList = parse_m3ua_opts(Remain),
+    {MsgClass, MsgType} = parse_m3ua_msg_class_and_type(MsgC, MsgT),
     #m3ua_msg{version = Version, msg_class = MsgClass, msg_type = MsgType,
               msg_length = MsgLen-4, payload = OptList};
 parse_m3ua_msg(Data) when is_list(Data) ->
@@ -190,8 +191,9 @@ parse_m3ua_opt(Opt, Msg) ->
 encode_m3ua_msg(#m3ua_msg{version = Version, msg_class = MsgClass,
                           msg_type = MsgType, payload = OptList}) ->
     OptBin = encode_m3ua_opts(OptList),
+    {MsgC, MsgT} = enc_m3ua_msg_class_and_type(MsgClass, MsgType),
     MsgLen = byte_size(OptBin) + 8,
-    <<Version:8, 0:8, MsgClass:8, MsgType:8, MsgLen:32/big, OptBin/binary>>.
+    <<Version:8, 0:8, MsgC:8, MsgT:8, MsgLen:32/big, OptBin/binary>>.
 
 encode_m3ua_opts(OptList) when is_list(OptList) ->
     encode_m3ua_opts(OptList, <<>>).
@@ -230,6 +232,100 @@ encode_m3ua_opt(Iei, Data) when is_binary(Data) ->
     PadLen = get_num_pad_bytes(Length),
     IEI = enc_iei(Iei),
     <<IEI:16/big, Length:16/big, Data/binary, 0:PadLen/integer-unit:8>>.
+
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_MGMT, ?M3UA_MSGT_MGMT_ERR) ->
+    {m3ua_msgc_mgmt, m3ua_msgt_mgmt_err};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_MGMT, ?M3UA_MSGT_MGMT_NTFY) ->
+    {m3ua_msgc_mgmt, m3ua_msgt_mgmt_ntfy};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_TRANSFER, ?M3UA_MSGT_XFR_DATA) ->
+    {m3ua_msgc_transfer, m3ua_msgt_xfr_data};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_SSNM, ?M3UA_MSGT_SSNM_DUNA) ->
+    {m3ua_msgc_ssnm, m3ua_msgt_ssnm_duna};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_SSNM, ?M3UA_MSGT_SSNM_DAVA) ->
+    {m3ua_msgc_ssnm, m3ua_msgt_ssnm_dava};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_SSNM, ?M3UA_MSGT_SSNM_DAUD) ->
+    {m3ua_msgc_ssnm, m3ua_msgt_ssnm_daud};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_SSNM, ?M3UA_MSGT_SSNM_SCON) ->
+    {m3ua_msgc_ssnm, m3ua_msgt_ssnm_scon};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_SSNM, ?M3UA_MSGT_SSNM_DUPU) ->
+    {m3ua_msgc_ssnm, m3ua_msgt_ssnm_dupu};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_SSNM, ?M3UA_MSGT_SSNM_DRST) ->
+    {m3ua_msgc_ssnm, m3ua_msgt_ssnm_drst};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_ASPSM, ?M3UA_MSGT_ASPSM_ASPUP) ->
+    {m3ua_msgc_aspsm, m3ua_msgt_aspsm_aspup};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_ASPSM, ?M3UA_MSGT_ASPSM_ASPDN) ->
+    {m3ua_msgc_aspsm, m3ua_msgt_aspsm_aspdn};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_ASPSM, ?M3UA_MSGT_ASPSM_BEAT) ->
+    {m3ua_msgc_aspsm, m3ua_msgt_aspsm_beat};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_ASPSM, ?M3UA_MSGT_ASPSM_ASPUP_ACK) ->
+    {m3ua_msgc_aspsm, m3ua_msgt_aspsm_aspup_ack};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_ASPSM, ?M3UA_MSGT_ASPSM_ASPDN_ACK) ->
+    {m3ua_msgc_aspsm, m3ua_msgt_aspsm_aspdn_ack};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_ASPSM, ?M3UA_MSGT_ASPSM_BEAT_ACK) ->
+    {m3ua_msgc_aspsm, m3ua_msgt_aspsm_beat_ack};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_ASPTM, ?M3UA_MSGT_ASPTM_ASPAC) ->
+    {m3ua_msgc_asptm, m3ua_msgt_asptm_aspac};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_ASPTM, ?M3UA_MSGT_ASPTM_ASPIA) ->
+    {m3ua_msgc_asptm, m3ua_msgt_asptm_aspia};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_ASPTM, ?M3UA_MSGT_ASPTM_ASPAC_ACK) ->
+    {m3ua_msgc_asptm, m3ua_msgt_asptm_aspac_ack};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_ASPTM, ?M3UA_MSGT_ASPTM_ASPIA_ACK) ->
+    {m3ua_msgc_asptm, m3ua_msgt_asptm_aspia_ack};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_RKM, ?M3UA_MSGT_RKM_REG_REQ) ->
+    {m3ua_msgc_rkm, m3ua_msgt_rkm_reg_req};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_RKM, ?M3UA_MSGT_RKM_REG_RSP) ->
+    {m3ua_msgc_rkm, m3ua_msgt_rkm_reg_rsp};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_RKM, ?M3UA_MSGT_RKM_DEREG_REQ) ->
+    {m3ua_msgc_rkm, m3ua_msgt_rkm_dereg_req};
+parse_m3ua_msg_class_and_type(?M3UA_MSGC_RKM, ?M3UA_MSGT_RKM_DEREG_RSP) ->
+    {m3ua_msgc_rkm, m3ua_msgt_rkm_dereg_rsp}.
+
+enc_m3ua_msg_class_and_type(m3ua_msgc_mgmt, m3ua_msgt_mgmt_err) ->
+    {?M3UA_MSGC_MGMT, ?M3UA_MSGT_MGMT_ERR};
+enc_m3ua_msg_class_and_type(m3ua_msgc_mgmt, m3ua_msgt_mgmt_ntfy) ->
+    {?M3UA_MSGC_MGMT, ?M3UA_MSGT_MGMT_NTFY};
+enc_m3ua_msg_class_and_type(m3ua_msgc_transfer, m3ua_msgt_xfr_data) ->
+    {?M3UA_MSGC_TRANSFER, ?M3UA_MSGT_XFR_DATA};
+enc_m3ua_msg_class_and_type(m3ua_msgc_ssnm, m3ua_msgt_ssnm_duna) ->
+    {?M3UA_MSGC_SSNM, ?M3UA_MSGT_SSNM_DUNA};
+enc_m3ua_msg_class_and_type(m3ua_msgc_ssnm, m3ua_msgt_ssnm_dava) ->
+    {?M3UA_MSGC_SSNM, ?M3UA_MSGT_SSNM_DAVA};
+enc_m3ua_msg_class_and_type(m3ua_msgc_ssnm, m3ua_msgt_ssnm_daud) ->
+    {?M3UA_MSGC_SSNM, ?M3UA_MSGT_SSNM_DAUD};
+enc_m3ua_msg_class_and_type(m3ua_msgc_ssnm, m3ua_msgt_ssnm_scon) ->
+    {?M3UA_MSGC_SSNM, ?M3UA_MSGT_SSNM_SCON};
+enc_m3ua_msg_class_and_type(m3ua_msgc_ssnm, m3ua_msgt_ssnm_dupu) ->
+    {?M3UA_MSGC_SSNM, ?M3UA_MSGT_SSNM_DUPU};
+enc_m3ua_msg_class_and_type(m3ua_msgc_ssnm, m3ua_msgt_ssnm_drst) ->
+    {?M3UA_MSGC_SSNM, ?M3UA_MSGT_SSNM_DRST};
+enc_m3ua_msg_class_and_type(m3ua_msgc_aspsm, m3ua_msgt_aspsm_aspup) ->
+    {?M3UA_MSGC_ASPSM, ?M3UA_MSGT_ASPSM_ASPUP};
+enc_m3ua_msg_class_and_type(m3ua_msgc_aspsm, m3ua_msgt_aspsm_aspdn) ->
+    {?M3UA_MSGC_ASPSM, ?M3UA_MSGT_ASPSM_ASPDN};
+enc_m3ua_msg_class_and_type(m3ua_msgc_aspsm, m3ua_msgt_aspsm_beat) ->
+    {?M3UA_MSGC_ASPSM, ?M3UA_MSGT_ASPSM_BEAT};
+enc_m3ua_msg_class_and_type(m3ua_msgc_aspsm, m3ua_msgt_aspsm_aspup_ack) ->
+    {?M3UA_MSGC_ASPSM, ?M3UA_MSGT_ASPSM_ASPUP_ACK};
+enc_m3ua_msg_class_and_type(m3ua_msgc_aspsm, m3ua_msgt_aspsm_aspdn_ack) ->
+    {?M3UA_MSGC_ASPSM, ?M3UA_MSGT_ASPSM_ASPDN_ACK};
+enc_m3ua_msg_class_and_type(m3ua_msgc_aspsm, m3ua_msgt_aspsm_beat_ack) ->
+    {?M3UA_MSGC_ASPSM, ?M3UA_MSGT_ASPSM_BEAT_ACK};
+enc_m3ua_msg_class_and_type(m3ua_msgc_asptm, m3ua_msgt_asptm_aspac) ->
+    {?M3UA_MSGC_ASPTM, ?M3UA_MSGT_ASPTM_ASPAC};
+enc_m3ua_msg_class_and_type(m3ua_msgc_asptm, m3ua_msgt_asptm_aspia) ->
+    {?M3UA_MSGC_ASPTM, ?M3UA_MSGT_ASPTM_ASPIA};
+enc_m3ua_msg_class_and_type(m3ua_msgc_asptm, m3ua_msgt_asptm_aspac_ack) ->
+    {?M3UA_MSGC_ASPTM, ?M3UA_MSGT_ASPTM_ASPAC_ACK};
+enc_m3ua_msg_class_and_type(m3ua_msgc_asptm, m3ua_msgt_asptm_aspia_ack) ->
+    {?M3UA_MSGC_ASPTM, ?M3UA_MSGT_ASPTM_ASPIA_ACK};
+enc_m3ua_msg_class_and_type(m3ua_msgc_rkm, m3ua_msgt_rkm_reg_req) ->
+    {?M3UA_MSGC_RKM, ?M3UA_MSGT_RKM_REG_REQ};
+enc_m3ua_msg_class_and_type(m3ua_msgc_rkm, m3ua_msgt_rkm_reg_rsp) ->
+    {?M3UA_MSGC_RKM, ?M3UA_MSGT_RKM_REG_RSP};
+enc_m3ua_msg_class_and_type(m3ua_msgc_rkm, m3ua_msgt_rkm_dereg_req) ->
+    {?M3UA_MSGC_RKM, ?M3UA_MSGT_RKM_DEREG_REQ};
+enc_m3ua_msg_class_and_type(m3ua_msgc_rkm, m3ua_msgt_rkm_dereg_rsp) ->
+    {?M3UA_MSGC_RKM, ?M3UA_MSGT_RKM_DEREG_RSP}.
 
 dec_iei(?M3UA_IEI_INFO_STRING)    -> m3ua_iei_info_string;
 dec_iei(?M3UA_IEI_ROUTE_CTX)      -> m3ua_iei_route_ctx;

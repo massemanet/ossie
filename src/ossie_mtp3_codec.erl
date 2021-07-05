@@ -38,7 +38,7 @@
 -export([parse_mtp3_msg/1, encode_mtp3_msg/1, invert_rout_lbl/1]).
 
 %% Parse standard routing label according to Section 2.2 of ITU-T Q.704
-parse_mtp3_routing_label(_, LabelBin) when is_binary(LabelBin) ->
+parse_mtp3_routing_label(LabelBin) when is_binary(LabelBin) ->
     %% we need to swap the four bytes and then parse the fields
     <<Label32:32/little, Remain/binary>> = LabelBin,
     LabelRev = <<Label32:32/big>>,
@@ -46,8 +46,9 @@ parse_mtp3_routing_label(_, LabelBin) when is_binary(LabelBin) ->
     {ok, #mtp3_routing_label{sig_link_sel = Sls, origin_pc = Opc, dest_pc = Dpc}, Remain}.
 
 parse_mtp3_msg(DataBin) when is_binary(DataBin) ->
-    <<NetInd:2, 0:2, ServiceInd:4, Remain/binary>> = DataBin,
-    {ok, RoutLbl, Payload} = parse_mtp3_routing_label(ServiceInd, Remain),
+    <<NetInd:2, 0:2, SI:4, Remain/binary>> = DataBin,
+    ServiceInd = parse_mtp3_service_indicator(SI),
+    {ok, RoutLbl, Payload} = parse_mtp3_routing_label(Remain),
     PayloadDec = decode_payload(ServiceInd, Payload),
     #mtp3_msg{network_ind = NetInd, service_ind = ServiceInd, routing_label = RoutLbl,
               payload = PayloadDec}.
@@ -65,25 +66,47 @@ encode_mtp3_msg(#mtp3_msg{network_ind = NetInd, service_ind = ServiceInd,
                           routing_label = RoutLbl, payload = Payload}) ->
     RoutLblBin = encode_mtp3_routing_label(RoutLbl),
     PayloadBin = payload_to_binary(ServiceInd, Payload),
-    <<NetInd:2, 0:2, ServiceInd:4, RoutLblBin/binary, PayloadBin/binary>>.
+    SI = enc_mtp3_service_indicator(ServiceInd),
+    <<NetInd:2, 0:2, SI:4, RoutLblBin/binary, PayloadBin/binary>>.
 
-decode_payload(?MTP3_SERV_MTN, Payload) ->
+decode_payload(mtp3_serv_mtn, Payload) ->
     <<H1:4, H0:4, _Len:4, 0:4, TP/binary>> = Payload,
     #mtp3mg_msg{h0 = H0, h1 = H1, payload = TP};
-decode_payload(?MTP3_SERV_MGMT, Payload) ->
+decode_payload(mtp3_serv_mgmt, Payload) ->
     <<H1:4, H0:4, Remain/binary>> = Payload,
     #mtp3mg_msg{h0 = H0, h1 = H1, payload = Remain};
 decode_payload(_, Payload) ->
     Payload.
 
-payload_to_binary(?MTP3_SERV_MTN, #mtp3mg_msg{h0=H0, h1=H1, payload=TP}) ->
+payload_to_binary(mtp3_serv_mtn, #mtp3mg_msg{h0=H0, h1=H1, payload=TP}) ->
     Len = byte_size(TP),
     <<H1:4, H0:4, Len:4, 0:4, TP/binary>>;
-payload_to_binary(?MTP3_SERV_MGMT, #mtp3mg_msg{h0=H0, h1=H1, payload=Payload}) ->
+payload_to_binary(mtp3_serv_mgmt, #mtp3mg_msg{h0=H0, h1=H1, payload=Payload}) ->
     <<H1:4, H0:4, Payload/binary>>;
 payload_to_binary(_, Whatever) ->
     Whatever.
 
+parse_mtp3_service_indicator(?MTP3_SERV_MGMT) ->
+    mtp3_serv_mgmt;
+parse_mtp3_service_indicator(?MTP3_SERV_MTN) ->
+    mtp3_serv_mtn;
+parse_mtp3_service_indicator(?MTP3_SERV_SCCP) ->
+    mtp3_serv_sccp;
+parse_mtp3_service_indicator(?MTP3_SERV_TUP) ->
+    mtp3_serv_tup;
+parse_mtp3_service_indicator(?MTP3_SERV_ISUP) ->
+    mtp3_serv_isup.
+
+enc_mtp3_service_indicator(mtp3_serv_mgmt) ->
+    ?MTP3_SERV_MGMT;
+enc_mtp3_service_indicator(mtp3_serv_mtn) ->
+    ?MTP3_SERV_MTN;
+enc_mtp3_service_indicator(mtp3_serv_sccp) ->
+    ?MTP3_SERV_SCCP;
+enc_mtp3_service_indicator(mtp3_serv_tup) ->
+    ?MTP3_SERV_TUP;
+enc_mtp3_service_indicator(mtp3_serv_isup) ->
+    ?MTP3_SERV_ISUP.
 
 invert_rout_lbl(L = #mtp3_routing_label{origin_pc = Opc, dest_pc = Dpc}) ->
     L#mtp3_routing_label{origin_pc = Dpc, dest_pc = Opc}.
