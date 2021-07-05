@@ -4,7 +4,6 @@
 -define(EUNIT_DEBUG_VAL_DEPTH, 100).
 -include_lib("eunit/include/eunit.hrl").
 
--include("../include/sctp.hrl").
 -include("../include/m3ua.hrl").
 -include("../include/mtp3.hrl").
 
