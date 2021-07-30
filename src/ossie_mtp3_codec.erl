@@ -37,6 +37,8 @@
 
 -export([parse_mtp3_msg/1, encode_mtp3_msg/1, invert_rout_lbl/1]).
 
+-export([parse_mtp3_service_indicator/1, enc_mtp3_service_indicator/1]).
+
 %% Parse standard routing label according to Section 2.2 of ITU-T Q.704
 parse_mtp3_routing_label(LabelBin) when is_binary(LabelBin) ->
     %% we need to swap the four bytes and then parse the fields
@@ -86,6 +88,23 @@ payload_to_binary(mtp3_serv_mgmt, #mtp3mg_msg{h0=H0, h1=H1, payload=Payload}) ->
 payload_to_binary(_, Whatever) ->
     Whatever.
 
+%% DCBA
+%% 0000 - 0 - Signalling network management messages
+%% 0001 - 1 - Signalling network testing and maintenance messages
+%% 0010 - 2 - Spare
+%% 0011 - 3 - SCCP
+%% 0100 - 4 - Telephone User Part
+%% 0101 - 5 - ISDN User Part
+%% 0110 - 6 - Data User Part (call and circuit-related messages)
+%% 0111 - 7 - Data User Part (facility registration and cancellation messages)
+%% 1000 - 8 - Reserved for MTP Testing User Part
+%% 1001 - 9 - Broadband ISDN User Part
+%% 1010 - 10 - Satellite ISDN User Part
+%% 1011) - 11
+%% 1100)
+%% 1101) - Spare
+%% 1110)
+%% 1111)
 parse_mtp3_service_indicator(?MTP3_SERV_MGMT) ->
     mtp3_serv_mgmt;
 parse_mtp3_service_indicator(?MTP3_SERV_MTN) ->
