@@ -1,4 +1,4 @@
-%% M3UA in accordance with RFC4666 (http://tools.ietf.org/html/rfc4666)
+%% M3UA in accordance with RFC4666 (https://tools.ietf.org/html/rfc4666)
 
 %% (C) 2011 by Harald Welte <laforge@gnumonks.org>
 %%
@@ -71,7 +71,8 @@ parse_m3ua_opt(m3ua_iei_protocol_data = Opt, MsgBin) when is_binary(MsgBin) ->
     <<Opc:32/big, Dpc:32/big, Si:8, Ni:8, Mp:8, Sls:8, Payload/binary>> = MsgBin,
     %% The idea is to hand back a #mtp3_msg{} to make upper layers beyond
     %% MTP-TRANSFR.{ind,req} unaware of a MTP3 or M3UA lower layer
-    {Opt, #mtp3_msg{network_ind = Ni, service_ind = Si,
+    ServiceInd = parse_mtp3_user_identity(Si),
+    {Opt, #mtp3_msg{network_ind = Ni, service_ind = ServiceInd,
                     routing_label = #mtp3_routing_label{sig_link_sel = Sls,
                                                         origin_pc = Opc,
                                                         dest_pc = Dpc},
@@ -205,7 +206,7 @@ encode_m3ua_opts([{Iei, Attr}|Tail], Bin) ->
     encode_m3ua_opts(Tail, <<Bin/binary, OptBin/binary>>).
 
 encode_m3ua_opt(m3ua_iei_protocol_data, Mtp3) when is_record(Mtp3, mtp3_msg) ->
-    #mtp3_msg{network_ind = Ni, service_ind = Si,
+    #mtp3_msg{network_ind = Ni, service_ind = ServiceInd,
               routing_label = #mtp3_routing_label{sig_link_sel = Sls,
                                                   origin_pc = OpcIn,
                                                   dest_pc = DpcIn},
@@ -216,6 +217,7 @@ encode_m3ua_opt(m3ua_iei_protocol_data, Mtp3) when is_record(Mtp3, mtp3_msg) ->
         undefined -> MpD = 0;
         _ -> MpD = Mp
     end,
+    Si = encode_mtp3_user_identity(ServiceInd),
     PayBin = <<Opc:32/big, Dpc:32/big, Si:8, Ni:8, MpD:8, Sls:8, Payload/binary>>,
     encode_m3ua_opt(m3ua_iei_protocol_data, PayBin);
 encode_m3ua_opt(m3ua_iei_orig_pc_list = Opt, PCs) when is_list(PCs) ->
@@ -232,6 +234,28 @@ encode_m3ua_opt(Iei, Data) when is_binary(Data) ->
     PadLen = get_num_pad_bytes(Length),
     IEI = enc_iei(Iei),
     <<IEI:16/big, Length:16/big, Data/binary, 0:PadLen/integer-unit:8>>.
+
+
+%% RFC4666 user identities
+%%
+%% 0 to 2   Reserved
+%%    3     SCCP
+%%    4     TUP
+%%    5     ISUP
+%% 6 to 8   Reserved
+%%    9     Broadband ISUP
+%%   10     Satellite ISUP
+%%   11     Reserved
+%%   12     AAL type 2 Signalling
+%%   13     Bearer Independent Call Control (BICC)
+%%   14     Gateway Control Protocol
+%%   15     Reserved
+%%
+%% ITU-T Q.704 uses similar service indicators, so let's use those
+parse_mtp3_user_identity(SI) ->
+    ossie_mtp3_codec:parse_mtp3_service_indicator(SI).
+encode_mtp3_user_identity(SI) ->
+    ossie_mtp3_codec:enc_mtp3_service_indicator(SI).
 
 parse_m3ua_msg_class_and_type(?M3UA_MSGC_MGMT, ?M3UA_MSGT_MGMT_ERR) ->
     {m3ua_msgc_mgmt, m3ua_msgt_mgmt_err};
